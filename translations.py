@@ -1,128 +1,298 @@
-"""
-Translations for the bot in Uzbek, Russian, and English
-"""
-
 TRANSLATIONS = {
     'uz': {
-        'welcome': '🎉 <b>Xush kelibsiz!</b>\n\nMen sizga do\'stlaringiz tug\'ilgan kunlarini eslab qolishda va qiziqarli do\'stlik testlari yaratishda yordam beraman!',
-        'main_menu': '🏠 <b>Asosiy menyu</b>\n\nKerakli bo\'limni tanlang:',
-        'add_birthday': '➕ Tug\'ilgan kun qo\'shish',
-        'my_birthdays': '🎂 Mening tug\'ilgan kunlarim',
-        'create_test': '✨ Test yaratish',
+        'welcome': (
+            '👋 <b>Xush kelibsiz!</b>\n\n'
+            'Bu bot sizga do‘stlaringiz bilan munosabatlarni yanada mustahkamlashga yordam beradi 💙\n\n'
+            '🎂 Tug‘ilgan kunlarni unutmaslik\n'
+            '✨ Qiziqarli do‘stlik testlari yaratish\n'
+            '📊 Natijalarni ko‘rib borish\n\n'
+            '<i>Keling, birgalikda boshlaylik! 🎉</i>'
+        ),
+
+        'main_menu': (
+            '🏠 <b>Asosiy menyu</b>\n\n'
+            'Bu yerdan barcha asosiy funksiyalarga kirishingiz mumkin 👇\n\n'
+            '🎂 <b>Tug‘ilgan kunlar</b> — do‘stlaringiz va yaqinlaringiz muhim kunlarini saqlang\n'
+            '✨ <b>Do‘stlik testlari</b> — o‘zingiz haqingizda test yarating yoki boshqalarnikini yeching\n'
+            '📊 <b>Mening testlarim</b> — natijalar va statistika\n'
+            '⚙️ <b>Sozlamalar</b> — til va boshqa qulayliklar\n'
+            '⭐ <b>Premium</b> — cheklovlarsiz foydalanish\n\n'
+            '<i>Davom etish uchun bo‘limni tanlang 🙂</i>'
+        ),
+        
+        'add_birthday': '🎂 Tug\'ilgan kun',
+        'my_birthdays': '📋 Mening ro\'yxatim',
+        'create_test': '✨ Do\'stlik testi',
         'my_tests': '📊 Mening testlarim',
         'settings': '⚙️ Sozlamalar',
         'premium': '⭐ Premium',
         'back': '◀️ Orqaga',
-        'birthday_prompt': '📝 <b>Tug\'ilgan kun ma\'lumotlarini kiriting</b>\n\nMisol:\n• Aziza 12.03\n• Akam 7-aprel\n• John 1999-07-04',
-        'processing': '⏳ Qayta ishlanmoqda...',
-        'birthday_parse_error': '❌ <b>Xatolik!</b>\n\nTug\'ilgan kun ma\'lumotlarini tushunib bo\'lmadi. Iltimos, qaytadan kiriting.\n\n<i>Misol: Aziza 12.03</i>',
-        'birthday_saved': '✅ <b>Saqlandi!</b>\n\n🎂 <b>{name}</b> - {day}/{month} sana saqlandi!',
-        'birthday_list': '🎂 <b>Sizning tug\'ilgan kunlar ro\'yxati:</b>',
-        'no_birthdays': '📭 <b>Tug\'ilgan kunlar ro\'yxati bo\'sh</b>\n\nHali hech qanday tug\'ilgan kun qo\'shilmagan.',
-        'birthday_limit_reached': '⚠️ <b>Chegara to\'ldi!</b>\n\nBepul foydalanuvchilar 5 tagacha tug\'ilgan kun saqlashlari mumkin.\n\nKo\'proq qo\'shish uchun Premium ga o\'ting!',
-        'test_limit_reached': '⚠️ <b>Chegara to\'ldi!</b>\n\nBepul foydalanuvchilar 1 ta test yaratashlari mumkin.\n\nKo\'proq test yaratish uchun Premium ga o\'ting!',
-        'test_intro_creator': '🎯 <b>Ajoyib!</b>\n\nEndi boshlaylik. Yigitingiz/qiz do\'stingiz haqida quyida keltirilgan 15 ta savolga javob bering.\n\n<i>Bu test orqali do\'stlaringiz sizni qanchalik yaxshi bilishini tekshirishingiz mumkin!</i>',
-        'test_intro': '🎮 <b>Do\'stlik testi!</b>\n\nDo\'stingiz haqida 15 ta savolga javob bering va natijalarga e\'tibor qiling!\n\n<i>Tayyor bo\'lsangiz, boshlaylik!</i>',
+        
+        'birthday_prompt': '📝 <b>Tug\'ilgan kun qo\'shish</b>\n\nIsm va sanani yozing. Bir nechta odamni ham qo\'shishingiz mumkin!\n\n<b>Misol:</b>\n• Aziza 12.03\n• Akam 7-aprel\n• John 1999-07-04\n\n<i>💡 Maslahat: Har bir qatorga bitta odam ma\'lumotini kiriting</i>',
+        
+        'processing': '⏳ <i>Qayta ishlanmoqda...</i>',
+        
+        'birthday_parse_error': '❌ <b>Ma\'lumot noto\'g\'ri kiritildi</b>\n\nAfsus, tug\'ilgan kun ma\'lumotini tushunib bo\'lmadi. Iltimos, to\'g\'ri formatda qaytadan kiriting.\n\n<b>To\'g\'ri formatlar:</b>\n• Ism 12.03\n• Ism 12-mart\n• Ism 1999-07-04',
+        
+        'birthday_saved': '✅ <b>Muvaffaqiyatli saqlandi!</b>\n\n🎂 <b>{name}</b> — {day}.{month}\n\n<i>Tug\'ilgan kun yaqinlashganda sizga eslatma yuboraman!</i>',
+        
+        'birthday_list': '📋 <b>Tug\'ilgan kunlar ro\'yxati</b>\n\nSiz saqlagan barcha tug\'ilgan kunlar:',
+        
+        'no_birthdays': '📭 <b>Ro\'yxat hali bo\'sh</b>\n\nSiz hali hech qanday tug\'ilgan kun qo\'shmagansiz.\n\n<i>Birinchi tug\'ilgan kunni qo\'shish uchun pastdagi tugmani bosing! 👇</i>',
+        
+        'birthday_limit_reached': '⚠️ <b>Bepul rejadagi chegara tugadi</b>\n\nSiz maksimal <b>5 ta</b> tug\'ilgan kun saqlashingiz mumkin.\n\nKo\'proq qo\'shish va qo\'shimcha imkoniyatlardan foydalanish uchun <b>Premium</b>ga o\'ting! ⭐',
+        
+        'test_limit_reached': '⚠️ <b>Bepul rejadagi chegara tugadi</b>\n\nSiz maksimal <b>1 ta</b> test yaratishingiz mumkin.\n\nCheksiz testlar yaratish uchun <b>Premium</b>ga o\'ting! ⭐',
+        
+        'test_intro_creator': '🎯 <b>Ajoyib tanlov!</b>\n\nEndi siz haqingizda 15 ta savolga javob bering. Do\'stlaringiz bu savollar orqali sizni qanchalik yaxshi bilishlarini sinab ko\'rishadi.\n\n<i>Tayyor bo\'lsangiz, boshlaymiz! Har bir savol uchun o\'zingizga mos javobni tanlang.</i>',
+        
+        'test_intro': '🎮 <b>Do\'stlik testiga xush kelibsiz!</b>\n\nSizning do\'stingiz o\'zi haqida 15 ta savolga javob bergan. Endi navbat sizda — u haqida qanchalik ko\'p bilishingizni tekshirib ko\'ring!\n\n<i>Har bir to\'g\'ri javob uchun ball olasiz. Omad yor bo\'lsin! 🍀</i>',
+        
         'question': 'Savol',
-        'last_question': 'Oxirgi savol!',
-        'test_created': '🎊 <b>Test muvaffaqiyatli yaratildi!</b>\n\n👇 Do\'stlaringizga quyidagi havolani yuboring:\n\n<code>{link}</code>\n\n<i>Ular testni topshirib, sizni qanchalik yaxshi bilishlarini bilib olishlari mumkin!</i>',
-        'test_result_title': 'Natijangiz:',
-        'test_result': '🎯 <b>Ball:</b> {score}%\n\n👤 <b>Daraja:</b> {level}',
+        'last_question': 'So\'nggi savol',
+        
+        'test_created': '🎊 <b>Testingiz tayyor!</b>\n\nAjoyib! Sizning do\'stlik testingiz muvaffaqiyatli yaratildi.\n\n📎 <b>Testni ulashish uchun:</b>\n<code>{link}</code>\n\n<i>💡 Ushbu havolani do\'stlaringizga yuboring. Ular testni topshirib, sizni qanchalik yaxshi bilishlarini bilib olishadi!</i>',
+        
+        'test_result_title': 'Natija',
+        'test_result': '🎯 <b>Sizning natijangiz:</b> {score}%\n\n👤 <b>Do\'stlik darajasi:</b> {level}\n\n<i>Do\'stingiz siz haqingizda {score}% to\'g\'ri javob berdi!</i>',
+        
         'level_best_friend': '💎 Eng yaqin do\'st',
         'level_close_friend': '💫 Yaqin do\'st',
         'level_friend': '🤝 Do\'st',
         'level_acquaintance': '👋 Tanish',
-        'test_list': '📊 <b>Sizning testlaringiz:</b>',
-        'no_tests': '📭 <b>Testlar ro\'yxati bo\'sh</b>\n\nHali hech qanday test yaratilmagan.',
-        'settings_menu': '⚙️ <b>Sozlamalar</b>\n\nKerakli sozlamani tanlang:',
+        
+        'test_list': '📊 <b>Sizning testlaringiz</b>\n\nYaratilgan testlaringiz va statistika:',
+        
+        'no_tests': '📭 <b>Hali testlar yo\'q</b>\n\nSiz hali do\'stlik testi yaratmagansiz.\n\n<i>Birinchi testingizni yarating va do\'stlaringiz bilan ulashing! 🎯</i>',
+        
+        'settings_menu': '⚙️ <b>Sozlamalar</b>\n\nO\'zingizga qulay sozlamalarni tanlang:',
+        
         'change_language': '🌍 Tilni o\'zgartirish',
-        'premium_info': '⭐ <b>Premium</b>\n\n<b>Premium afzalliklari:</b>\n\n🎂 Cheksiz tug\'ilgan kunlar\n✨ Cheksiz testlar\n🎨 Maxsus dizaynlar\n📊 Batafsil statistika\n\n<i>Tez orada!</i>',
-        'error': '❌ <b>Xatolik yuz berdi!</b>\n\nIltimos, qaytadan urinib ko\'ring.',
-        'cancelled': '❌ Bekor qilindi',
-        'birthday_reminder': '🎉 <b>Bugun tug\'ilgan kun!</b>\n\n🎂 <b>{name}</b> ning tug\'ilgan kuni!\n\nTabriknoma yuboring! 🎁',
-        'generate_wish': '✨ Tabriknoma yaratish',
-        'generating_wish': '⏳ Tabriknoma yaratilmoqda...',
+        
+        'premium_info': '⭐ <b>Premium obuna</b>\n\nPremium a\'zolar uchun maxsus imkoniyatlar:\n\n🎂 <b>Cheksiz tug\'ilgan kunlar</b> — istalgancha qo\'shing\n✨ <b>Cheksiz testlar</b> — yaratishda chegara yo\'q\n🎨 <b>Maxsus dizaynlar</b> — o\'ziga xos ko\'rinish\n📊 <b>Batafsil statistika</b> — har bir testning to\'liq tahlili\n\n<i>Premium rejalar tez orada!</i> 🚀',
+        
+        'error': '❌ <b>Xatolik yuz berdi</b>\n\nAfsus, nimadir noto\'g\'ri ketdi. Iltimos, bir ozdan so\'ng qaytadan urinib ko\'ring.\n\n<i>Agar muammo takrorlansa, yordam xizmatiga murojaat qiling.</i>',
+        
+        'cancelled': '❌ <b>Bekor qilindi</b>\n\n<i>Bosh menyuga qaytdingiz.</i>',
+        
+        'birthday_reminder': '🎉 <b>Bugun muhim kun!</b>\n\n🎂 <b>{name}</b> bugun tug\'ilgan kunini nishonlamoqda!\n\n<i>Unutmang va chiroyli tabrik yuboring! 🎁</i>',
+        
+        'generate_wish': '✨ Tabrik yaratish',
+        'generating_wish': '⏳ <i>Maxsus tabrik tayyorlanmoqda...</i>',
+        
+        'create_your_test': '✨ O\'z testim',
+        'add_birthday_button': '🎂 Qo\'shish',
+        'share_bot': '📤 Ulashish',
+        'share_tests': '📤 Testni ulashish',
+        'create_new_test': '➕ Yangi test',
+        'test_number': 'Test #{num}',
+        'link': 'Havola',
+        'participants': 'Ishtirokchilar',
+        'avg_score': 'O\'rtacha',
+        'highest_score': 'Eng yuqori',
+        'lowest_score': 'Eng past',
+        'top_scorer': 'Eng yaxshi',
+        'no_participants': 'Hali hech kim topshirmagan',
+        'test_completed_notification': '🎉 <b>Yangi natija!</b>\n\n<b>{user_name}</b> sizning testingizni topshirdi.\n\n📊 <b>Natija:</b> {score}%',
+        'your_test': 'Sizning testingiz',
+        'share_test': '📤 Ulashish',
     },
     
     'ru': {
-        'welcome': '🎉 <b>Добро пожаловать!</b>\n\nЯ помогу вам запомнить дни рождения друзей и создавать веселые тесты на дружбу!',
-        'main_menu': '🏠 <b>Главное меню</b>\n\nВыберите нужный раздел:',
-        'add_birthday': '➕ Добавить день рождения',
-        'my_birthdays': '🎂 Мои дни рождения',
-        'create_test': '✨ Создать тест',
+        'welcome': (
+            '👋 <b>Добро пожаловать!</b>\n\n'
+            'Этот бот поможет вам стать ближе к друзьям 💙\n\n'
+            '🎂 Не забывать дни рождения\n'
+            '✨ Создавать интересные тесты о дружбе\n'
+            '📊 Смотреть результаты и статистику\n\n'
+            '<i>Давайте начнем! 🎉</i>'
+        ),
+
+        'main_menu': (
+            '🏠 <b>Главное меню</b>\n\n'
+            'Здесь собраны все основные функции бота 👇\n\n'
+            '🎂 <b>Дни рождения</b> — сохраняйте важные даты\n'
+            '✨ <b>Тесты на дружбу</b> — создавайте и проходите тесты\n'
+            '📊 <b>Мои тесты</b> — результаты и статистика\n'
+            '⚙️ <b>Настройки</b> — язык и удобства\n'
+            '⭐ <b>Premium</b> — без ограничений\n\n'
+            '<i>Выберите нужный раздел 🙂</i>'
+        ),
+        
+        'add_birthday': '🎂 День рождения',
+        'my_birthdays': '📋 Мой список',
+        'create_test': '✨ Тест на дружбу',
         'my_tests': '📊 Мои тесты',
         'settings': '⚙️ Настройки',
         'premium': '⭐ Premium',
         'back': '◀️ Назад',
-        'birthday_prompt': '📝 <b>Введите данные о дне рождения</b>\n\nПример:\n• Азиза 12.03\n• Брат 7-апреля\n• Джон 1999-07-04',
-        'processing': '⏳ Обрабатывается...',
-        'birthday_parse_error': '❌ <b>Ошибка!</b>\n\nНе удалось распознать данные о дне рождения. Пожалуйста, введите снова.\n\n<i>Пример: Азиза 12.03</i>',
-        'birthday_saved': '✅ <b>Сохранено!</b>\n\n🎂 <b>{name}</b> - {day}/{month} дата сохранена!',
-        'birthday_list': '🎂 <b>Ваш список дней рождения:</b>',
-        'no_birthdays': '📭 <b>Список дней рождения пуст</b>\n\nДни рождения еще не добавлены.',
-        'birthday_limit_reached': '⚠️ <b>Лимит исчерпан!</b>\n\nБесплатные пользователи могут сохранить до 5 дней рождения.\n\nДля добавления большего количества перейдите на Premium!',
-        'test_limit_reached': '⚠️ <b>Лимит исчерпан!</b>\n\nБесплатные пользователи могут создать 1 тест.\n\nДля создания большего количества тестов перейдите на Premium!',
-        'test_intro_creator': '🎯 <b>Отлично!</b>\n\nТеперь начнем. Ответьте на 15 вопросов о вашем парне/девушке.\n\n<i>С помощью этого теста вы сможете проверить, насколько хорошо друзья вас знают!</i>',
-        'test_intro': '🎮 <b>Тест на дружбу!</b>\n\nОтветьте на 15 вопросов о вашем друге и посмотрите на результаты!\n\n<i>Если готовы, начнем!</i>',
+        
+        'birthday_prompt': '📝 <b>Добавить день рождения</b>\n\nНапишите имя и дату. Можете добавить сразу несколько человек!\n\n<b>Пример:</b>\n• Азиза 12.03\n• Брат 7-апреля\n• Джон 1999-07-04\n\n<i>💡 Совет: Вводите данные каждого человека с новой строки</i>',
+        
+        'processing': '⏳ <i>Обрабатывается...</i>',
+        
+        'birthday_parse_error': '❌ <b>Данные введены неверно</b>\n\nК сожалению, не удалось распознать информацию о дне рождения. Пожалуйста, введите в правильном формате.\n\n<b>Правильные форматы:</b>\n• Имя 12.03\n• Имя 12-марта\n• Имя 1999-07-04',
+        
+        'birthday_saved': '✅ <b>Успешно сохранено!</b>\n\n🎂 <b>{name}</b> — {day}.{month}\n\n<i>Я напомню вам, когда приблизится день рождения!</i>',
+        
+        'birthday_list': '📋 <b>Список дней рождения</b>\n\nВсе сохраненные вами дни рождения:',
+        
+        'no_birthdays': '📭 <b>Список пока пуст</b>\n\nВы еще не добавили ни одного дня рождения.\n\n<i>Нажмите кнопку ниже, чтобы добавить первый! 👇</i>',
+        
+        'birthday_limit_reached': '⚠️ <b>Лимит бесплатного плана исчерпан</b>\n\nВы можете сохранить максимум <b>5</b> дней рождения.\n\nЧтобы добавить больше и получить дополнительные возможности, перейдите на <b>Premium</b>! ⭐',
+        
+        'test_limit_reached': '⚠️ <b>Лимит бесплатного плана исчерпан</b>\n\nВы можете создать максимум <b>1</b> тест.\n\nДля неограниченного количества тестов перейдите на <b>Premium</b>! ⭐',
+        
+        'test_intro_creator': '🎯 <b>Отличный выбор!</b>\n\nТеперь ответьте на 15 вопросов о себе. Ваши друзья пройдут эти вопросы и узнают, насколько хорошо они вас знают.\n\n<i>Готовы? Начинаем! Для каждого вопроса выберите подходящий для вас ответ.</i>',
+        
+        'test_intro': '🎮 <b>Добро пожаловать в тест на дружбу!</b>\n\nВаш друг ответил на 15 вопросов о себе. Теперь ваша очередь — проверьте, насколько хорошо вы его знаете!\n\n<i>За каждый правильный ответ вы получите балл. Удачи! 🍀</i>',
+        
         'question': 'Вопрос',
-        'last_question': 'Последний вопрос!',
-        'test_created': '🎊 <b>Тест успешно создан!</b>\n\n👇 Отправьте эту ссылку друзьям:\n\n<code>{link}</code>\n\n<i>Они пройдут тест и узнают, насколько хорошо они вас знают!</i>',
-        'test_result_title': 'Ваш результат:',
-        'test_result': '🎯 <b>Баллы:</b> {score}%\n\n👤 <b>Уровень:</b> {level}',
+        'last_question': 'Последний вопрос',
+        
+        'test_created': '🎊 <b>Ваш тест готов!</b>\n\nОтлично! Ваш тест на дружбу успешно создан.\n\n📎 <b>Ссылка для друзей:</b>\n<code>{link}</code>\n\n<i>💡 Отправьте эту ссылку друзьям. Они пройдут тест и узнают, насколько хорошо вас знают!</i>',
+        
+        'test_result_title': 'Результат',
+        'test_result': '🎯 <b>Ваш результат:</b> {score}%\n\n👤 <b>Уровень дружбы:</b> {level}\n\n<i>Ваш друг правильно ответил на {score}% вопросов о вас!</i>',
+        
         'level_best_friend': '💎 Лучший друг',
         'level_close_friend': '💫 Близкий друг',
         'level_friend': '🤝 Друг',
         'level_acquaintance': '👋 Знакомый',
-        'test_list': '📊 <b>Ваши тесты:</b>',
-        'no_tests': '📭 <b>Список тестов пуст</b>\n\nТесты еще не созданы.',
-        'settings_menu': '⚙️ <b>Настройки</b>\n\nВыберите нужную настройку:',
+        
+        'test_list': '📊 <b>Ваши тесты</b>\n\nСозданные вами тесты и статистика:',
+        
+        'no_tests': '📭 <b>Тестов пока нет</b>\n\nВы еще не создали ни одного теста на дружбу.\n\n<i>Создайте свой первый тест и поделитесь с друзьями! 🎯</i>',
+        
+        'settings_menu': '⚙️ <b>Настройки</b>\n\nВыберите удобные для вас настройки:',
+        
         'change_language': '🌍 Изменить язык',
-        'premium_info': '⭐ <b>Premium</b>\n\n<b>Преимущества Premium:</b>\n\n🎂 Неограниченные дни рождения\n✨ Неограниченные тесты\n🎨 Специальные дизайны\n📊 Подробная статистика\n\n<i>Скоро!</i>',
-        'error': '❌ <b>Произошла ошибка!</b>\n\nПожалуйста, попробуйте снова.',
-        'cancelled': '❌ Отменено',
-        'birthday_reminder': '🎉 <b>Сегодня день рождения!</b>\n\n🎂 День рождения <b>{name}</b>!\n\nОтправьте поздравление! 🎁',
+        
+        'premium_info': '⭐ <b>Premium подписка</b>\n\nСпециальные возможности для Premium пользователей:\n\n🎂 <b>Неограниченные дни рождения</b> — добавляйте сколько угодно\n✨ <b>Неограниченные тесты</b> — создавайте без ограничений\n🎨 <b>Специальные дизайны</b> — уникальный вид\n📊 <b>Подробная статистика</b> — полный анализ каждого теста\n\n<i>Premium планы скоро!</i> 🚀',
+        
+        'error': '❌ <b>Произошла ошибка</b>\n\nК сожалению, что-то пошло не так. Пожалуйста, попробуйте снова через некоторое время.\n\n<i>Если проблема повторяется, обратитесь в службу поддержки.</i>',
+        
+        'cancelled': '❌ <b>Отменено</b>\n\n<i>Вы вернулись в главное меню.</i>',
+        
+        'birthday_reminder': '🎉 <b>Сегодня важный день!</b>\n\n🎂 <b>{name}</b> сегодня отмечает день рождения!\n\n<i>Не забудьте отправить красивое поздравление! 🎁</i>',
+        
         'generate_wish': '✨ Создать поздравление',
-        'generating_wish': '⏳ Создается поздравление...',
+        'generating_wish': '⏳ <i>Готовлю особое поздравление...</i>',
+        
+        'create_your_test': '✨ Мой тест',
+        'add_birthday_button': '🎂 Добавить',
+        'share_bot': '📤 Поделиться',
+        'share_tests': '📤 Поделиться тестом',
+        'create_new_test': '➕ Новый тест',
+        'test_number': 'Тест #{num}',
+        'link': 'Ссылка',
+        'participants': 'Участники',
+        'avg_score': 'Средний',
+        'highest_score': 'Лучший',
+        'lowest_score': 'Худший',
+        'top_scorer': 'Лидер',
+        'no_participants': 'Тест еще никто не прошел',
+        'test_completed_notification': '🎉 <b>Новый результат!</b>\n\n<b>{user_name}</b> прошел ваш тест.\n\n📊 <b>Результат:</b> {score}%',
+        'your_test': 'Ваш тест',
+        'share_test': '📤 Поделиться',
     },
     
     'en': {
-        'welcome': '🎉 <b>Welcome!</b>\n\nI will help you remember your friends\' birthdays and create fun friendship tests!',
-        'main_menu': '🏠 <b>Main Menu</b>\n\nSelect an option:',
-        'add_birthday': '➕ Add Birthday',
-        'my_birthdays': '🎂 My Birthdays',
-        'create_test': '✨ Create Test',
+        'welcome': (
+            '👋 <b>Welcome!</b>\n\n'
+            'This bot helps you stay closer to your friends 💙\n\n'
+            '🎂 Never forget birthdays\n'
+            '✨ Create fun friendship tests\n'
+            '📊 Track results and stats\n\n'
+            '<i>Let’s get started! 🎉</i>'
+        ),
+
+        'main_menu': (
+            '🏠 <b>Main Menu</b>\n\n'
+            'All main features are available here 👇\n\n'
+            '🎂 <b>Birthdays</b> — save important dates\n'
+            '✨ <b>Friendship Tests</b> — create or take tests\n'
+            '📊 <b>My Tests</b> — view results and statistics\n'
+            '⚙️ <b>Settings</b> — language and preferences\n'
+            '⭐ <b>Premium</b> — unlock all features\n\n'
+            '<i>Select a section to continue 🙂</i>'
+        ),
+        
+        'add_birthday': '🎂 Birthday',
+        'my_birthdays': '📋 My List',
+        'create_test': '✨ Friendship Test',
         'my_tests': '📊 My Tests',
         'settings': '⚙️ Settings',
         'premium': '⭐ Premium',
         'back': '◀️ Back',
-        'birthday_prompt': '📝 <b>Enter birthday information</b>\n\nExample:\n• Aziza 12.03\n• My brother April 7\n• John 1999-07-04',
-        'processing': '⏳ Processing...',
-        'birthday_parse_error': '❌ <b>Error!</b>\n\nCouldn\'t understand birthday information. Please try again.\n\n<i>Example: Aziza 12.03</i>',
-        'birthday_saved': '✅ <b>Saved!</b>\n\n🎂 <b>{name}</b> - {day}/{month} has been saved!',
-        'birthday_list': '🎂 <b>Your Birthday List:</b>',
-        'no_birthdays': '📭 <b>Birthday list is empty</b>\n\nNo birthdays have been added yet.',
-        'birthday_limit_reached': '⚠️ <b>Limit Reached!</b>\n\nFree users can save up to 5 birthdays.\n\nUpgrade to Premium to add more!',
-        'test_limit_reached': '⚠️ <b>Limit Reached!</b>\n\nFree users can create 1 test.\n\nUpgrade to Premium to create more tests!',
-        'test_intro_creator': '🎯 <b>Great!</b>\n\nLet\'s begin. Answer 15 questions about your boyfriend/girlfriend.\n\n<i>With this test, you can check how well your friends know you!</i>',
-        'test_intro': '🎮 <b>Friendship Test!</b>\n\nAnswer 15 questions about your friend and see the results!\n\n<i>Ready? Let\'s start!</i>',
+        
+        'birthday_prompt': '📝 <b>Add a Birthday</b>\n\nWrite the name and date. You can add multiple people at once!\n\n<b>Example:</b>\n• Aziza 12.03\n• My brother April 7\n• John 1999-07-04\n\n<i>💡 Tip: Enter each person\'s details on a new line</i>',
+        
+        'processing': '⏳ <i>Processing...</i>',
+        
+        'birthday_parse_error': '❌ <b>Invalid data entered</b>\n\nSorry, couldn\'t recognize the birthday information. Please enter it in the correct format.\n\n<b>Correct formats:</b>\n• Name 12.03\n• Name 12-March\n• Name 1999-07-04',
+        
+        'birthday_saved': '✅ <b>Successfully saved!</b>\n\n🎂 <b>{name}</b> — {day}.{month}\n\n<i>I\'ll remind you when the birthday approaches!</i>',
+        
+        'birthday_list': '📋 <b>Birthday List</b>\n\nAll your saved birthdays:',
+        
+        'no_birthdays': '📭 <b>List is empty</b>\n\nYou haven\'t added any birthdays yet.\n\n<i>Click the button below to add your first one! 👇</i>',
+        
+        'birthday_limit_reached': '⚠️ <b>Free plan limit reached</b>\n\nYou can save up to <b>5</b> birthdays.\n\nTo add more and get additional features, upgrade to <b>Premium</b>! ⭐',
+        
+        'test_limit_reached': '⚠️ <b>Free plan limit reached</b>\n\nYou can create up to <b>1</b> test.\n\nFor unlimited tests, upgrade to <b>Premium</b>! ⭐',
+        
+        'test_intro_creator': '🎯 <b>Great choice!</b>\n\nNow answer 15 questions about yourself. Your friends will go through these questions to find out how well they know you.\n\n<i>Ready? Let\'s begin! For each question, choose the answer that fits you best.</i>',
+        
+        'test_intro': '🎮 <b>Welcome to the Friendship Test!</b>\n\nYour friend answered 15 questions about themselves. Now it\'s your turn — check how well you know them!\n\n<i>You\'ll get points for each correct answer. Good luck! 🍀</i>',
+        
         'question': 'Question',
-        'last_question': 'Last question!',
-        'test_created': '🎊 <b>Test created successfully!</b>\n\n👇 Send this link to your friends:\n\n<code>{link}</code>\n\n<i>They can take the test and find out how well they know you!</i>',
-        'test_result_title': 'Your Result:',
-        'test_result': '🎯 <b>Score:</b> {score}%\n\n👤 <b>Level:</b> {level}',
+        'last_question': 'Last question',
+        
+        'test_created': '🎊 <b>Your test is ready!</b>\n\nAwesome! Your friendship test has been successfully created.\n\n📎 <b>Share link:</b>\n<code>{link}</code>\n\n<i>💡 Send this link to your friends. They\'ll take the test and find out how well they know you!</i>',
+        
+        'test_result_title': 'Result',
+        'test_result': '🎯 <b>Your result:</b> {score}%\n\n👤 <b>Friendship level:</b> {level}\n\n<i>Your friend answered {score}% correctly about you!</i>',
+        
         'level_best_friend': '💎 Best Friend',
         'level_close_friend': '💫 Close Friend',
         'level_friend': '🤝 Friend',
         'level_acquaintance': '👋 Acquaintance',
-        'test_list': '📊 <b>Your Tests:</b>',
-        'no_tests': '📭 <b>Test list is empty</b>\n\nNo tests have been created yet.',
-        'settings_menu': '⚙️ <b>Settings</b>\n\nSelect a setting:',
+        
+        'test_list': '📊 <b>Your Tests</b>\n\nYour created tests and statistics:',
+        
+        'no_tests': '📭 <b>No tests yet</b>\n\nYou haven\'t created any friendship tests yet.\n\n<i>Create your first test and share it with friends! 🎯</i>',
+        
+        'settings_menu': '⚙️ <b>Settings</b>\n\nChoose your preferred settings:',
+        
         'change_language': '🌍 Change Language',
-        'premium_info': '⭐ <b>Premium</b>\n\n<b>Premium Benefits:</b>\n\n🎂 Unlimited birthdays\n✨ Unlimited tests\n🎨 Special designs\n📊 Detailed statistics\n\n<i>Coming soon!</i>',
-        'error': '❌ <b>An error occurred!</b>\n\nPlease try again.',
-        'cancelled': '❌ Cancelled',
-        'birthday_reminder': '🎉 <b>Birthday Today!</b>\n\n🎂 It\'s <b>{name}</b>\'s birthday!\n\nSend a greeting! 🎁',
+        
+        'premium_info': '⭐ <b>Premium Subscription</b>\n\nSpecial features for Premium users:\n\n🎂 <b>Unlimited birthdays</b> — add as many as you want\n✨ <b>Unlimited tests</b> — create without restrictions\n🎨 <b>Special designs</b> — unique appearance\n📊 <b>Detailed statistics</b> — full analysis of each test\n\n<i>Premium plans coming soon!</i> 🚀',
+        
+        'error': '❌ <b>An error occurred</b>\n\nSorry, something went wrong. Please try again in a moment.\n\n<i>If the problem persists, contact support.</i>',
+        
+        'cancelled': '❌ <b>Cancelled</b>\n\n<i>You\'ve returned to the main menu.</i>',
+        
+        'birthday_reminder': '🎉 <b>Important day today!</b>\n\n🎂 <b>{name}</b> is celebrating their birthday today!\n\n<i>Don\'t forget to send a nice greeting! 🎁</i>',
+        
         'generate_wish': '✨ Generate Wish',
-        'generating_wish': '⏳ Generating wish...',
+        'generating_wish': '⏳ <i>Preparing a special wish...</i>',
+        
+        'create_your_test': '✨ My Test',
+        'add_birthday_button': '🎂 Add',
+        'share_bot': '📤 Share',
+        'share_tests': '📤 Share Test',
+        'create_new_test': '➕ New Test',
+        'test_number': 'Test #{num}',
+        'link': 'Link',
+        'participants': 'Participants',
+        'avg_score': 'Average',
+        'highest_score': 'Highest',
+        'lowest_score': 'Lowest',
+        'top_scorer': 'Top',
+        'no_participants': 'No one has taken this test yet',
+        'test_completed_notification': '🎉 <b>New result!</b>\n\n<b>{user_name}</b> completed your test.\n\n📊 <b>Result:</b> {score}%',
+        'your_test': 'Your test',
+        'share_test': '📤 Share',
     }
 }

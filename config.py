@@ -41,8 +41,13 @@ model = genai.GenerativeModel("gemini-2.5-flash")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-ADMIN_USERNAME="@Simplelearn\\_main\\_admin"
+ADMIN_USERNAME="@Simplelearn_main_admin"
 ADMIN_USERNAME_2="@Uzbek\\_europe\\_admin"
+
+
+CARD_NUMBER = "4073 4200 3711 6443"
+ADMIN_CHAT_ID = "8437026582"
+NOTIFICATION_ADMIN_IDS = ["8437026582"]
 
 
 # # Admin for Instagram verification
@@ -58,8 +63,8 @@ ADMIN_IDS = [8437026582, 122290051, 999932510]
 
 
 # Free tier limits
-FREE_BIRTHDAY_LIMIT = 5
-FREE_TEST_LIMIT = 1
+FREE_BIRTHDAY_LIMIT = 50
+FREE_TEST_LIMIT = 3
 
 # Premium pricing
 PREMIUM_PRICE_MONTHLY = 4.99

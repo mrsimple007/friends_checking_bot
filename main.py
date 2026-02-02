@@ -14,14 +14,19 @@ from telegram.ext import (
     CallbackQueryHandler, filters, ContextTypes
 )
 from telegram.constants import ParseMode
-from config import supabase, model, TELEGRAM_BOT_TOKEN
+from config import supabase, model, TELEGRAM_BOT_TOKEN, FREE_BIRTHDAY_LIMIT, FREE_TEST_LIMIT
+from share import share_main
+from balance import premium_info_handler, subscribe_callback
+import urllib.parse
 
 # Logging setup
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", 
-    level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 
 
 # Conversation states
@@ -30,12 +35,25 @@ ADDING_BIRTHDAY = 1
 CREATING_TEST = 2
 TAKING_TEST = 3
 
-# Free tier limits
-FREE_BIRTHDAY_LIMIT = 5
-FREE_TEST_LIMIT = 1
-
 # Load translations
 from translations import TRANSLATIONS
+
+question0_img=os.environ.get("question0","")
+question1_img=os.environ.get("question1","")
+question2_img=os.environ.get("question2","")
+question3_img=os.environ.get("question3","")
+question4_img=os.environ.get("question4","")
+question5_img=os.environ.get("question5","")
+question6_img=os.environ.get("question6","")
+question7_img=os.environ.get("question7","")
+question8_img=os.environ.get("question8","")
+question9_img=os.environ.get("question9","")
+question10_img=os.environ.get("question10","")
+question11_img=os.environ.get("question11","")
+question12_img=os.environ.get("question12","")
+question13_img=os.environ.get("question13","")
+question14_img=os.environ.get("question14","")
+
 
 # Helper Functions
 def get_text(lang: str, key: str) -> str:
@@ -69,37 +87,51 @@ def save_user(telegram_id: int, username: str, language: str, is_premium: bool =
     except Exception as e:
         logger.error(f"Error saving user: {e}")
 
-def parse_birthday_with_ai(text: str, lang: str) -> Optional[Dict]:
-    """Parse birthday text using Gemini AI"""
+def parse_birthday_with_ai(text: str, lang: str) -> Optional[List[Dict]]:
+    """Parse birthday text using Gemini AI - can handle single or multiple birthdays"""
     try:
         prompt = f"""
-Extract the name and birthday from this text: "{text}"
+Extract ALL names and birthdays from this text: "{text}"
 
-Return ONLY a valid JSON object with this exact structure:
-{{
-    "name": "extracted name",
-    "day": day_number,
-    "month": month_number,
-    "year": year_number_or_null
-}}
+Return ONLY a valid JSON array with this exact structure:
+[
+    {{
+        "name": "extracted name",
+        "day": day_number,
+        "month": month_number,
+        "year": year_number_or_null
+    }}
+]
 
 Rules:
 - day: 1-31
 - month: 1-12
 - year: full year (e.g., 1995) or null if not provided
-- If you cannot extract valid information, return null
+- Month names in Uzbek/Russian/English should be converted to numbers:
+  * yanvar/январь/january = 1
+  * fevral/февраль/february = 2
+  * mart/март/march = 3
+  * april/апрель/april = 4
+  * may/май/may = 5
+  * iyun/июнь/june = 6
+  * iyul/июль/july = 7
+  * avgust/август/august = 8
+  * sentabr/сентябрь/september = 9
+  * oktabr/октябрь/october = 10
+  * noyabr/ноябрь/november = 11
+  * dekabr/декабрь/december = 12
+- If the text contains multiple people, return an array with multiple objects
+- If a line has a name but no date, skip it
+- If you cannot extract valid information, return empty array []
 
 Examples:
 Input: "Aziza 12.03"
-Output: {{"name": "Aziza", "day": 12, "month": 3, "year": null}}
+Output: [{{"name": "Aziza", "day": 12, "month": 3, "year": null}}]
 
-Input: "My brother born on April 7"
-Output: {{"name": "My brother", "day": 7, "month": 4, "year": null}}
+Input: "Annam 15 yanvar\\nVohid ovam 21 mart"
+Output: [{{"name": "Annam", "day": 15, "month": 1, "year": null}}, {{"name": "Vohid ovam", "day": 21, "month": 3, "year": null}}]
 
-Input: "John 1999-07-04"
-Output: {{"name": "John", "day": 4, "month": 7, "year": 1999}}
-
-Now process the input text.
+Now process the input text and extract ALL birthdays.
 """
         
         response = model.generate_content(prompt)
@@ -112,13 +144,17 @@ Now process the input text.
         result = json.loads(result_text)
         
         # Validate
-        if result and isinstance(result, dict):
-            if 'name' in result and 'day' in result and 'month' in result:
-                day = int(result['day'])
-                month = int(result['month'])
-                
-                if 1 <= day <= 31 and 1 <= month <= 12:
-                    return result
+        if result and isinstance(result, list):
+            validated_results = []
+            for item in result:
+                if isinstance(item, dict) and 'name' in item and 'day' in item and 'month' in item:
+                    day = int(item['day'])
+                    month = int(item['month'])
+                    
+                    if 1 <= day <= 31 and 1 <= month <= 12:
+                        validated_results.append(item)
+            
+            return validated_results if validated_results else None
         
         return None
     except Exception as e:
@@ -306,24 +342,47 @@ async def process_birthday(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(get_text(lang, 'birthday_parse_error'), parse_mode=ParseMode.HTML)
         return ADDING_BIRTHDAY
     
+    # Check limits
+    birthday_count = get_user_birthday_count(user_id)
+    is_premium = is_user_premium(user_id)
+    
+    if not is_premium and (birthday_count + len(parsed)) > FREE_BIRTHDAY_LIMIT:
+        remaining = FREE_BIRTHDAY_LIMIT - birthday_count
+        if remaining > 0:
+            await update.message.reply_text(
+                f"⚠️ You can only add {remaining} more birthday(s) with the free plan.",
+                parse_mode=ParseMode.HTML
+            )
+            return ADDING_BIRTHDAY
+        else:
+            await update.message.reply_text(get_text(lang, 'birthday_limit_reached'), parse_mode=ParseMode.HTML)
+            return ConversationHandler.END
+    
     # Save to database
     try:
-        birthday_data = {
-            'user_id': str(user_id),
-            'name': parsed['name'],
-            'day': parsed['day'],
-            'month': parsed['month'],
-            'year': parsed.get('year'),
-            'created_at': datetime.now(timezone.utc).isoformat()
-        }
+        saved_count = 0
+        for birthday in parsed:
+            birthday_data = {
+                'user_id': str(user_id),
+                'name': birthday['name'],
+                'day': birthday['day'],
+                'month': birthday['month'],
+                'year': birthday.get('year'),
+                'created_at': datetime.now(timezone.utc).isoformat()
+            }
+            
+            supabase.table('birthdays').insert(birthday_data).execute()
+            saved_count += 1
         
-        supabase.table('birthdays').insert(birthday_data).execute()
+        if saved_count == 1:
+            success_text = get_text(lang, 'birthday_saved').format(
+                name=parsed[0]['name'],
+                day=parsed[0]['day'],
+                month=parsed[0]['month']
+            )
+        else:
+            success_text = f"✅ <b>Saqlandi!</b>\n\n🎂 {saved_count} ta tug'ilgan kun muvaffaqiyatli saqlandi!"
         
-        success_text = get_text(lang, 'birthday_saved').format(
-            name=parsed['name'],
-            day=parsed['day'],
-            month=parsed['month']
-        )
         await update.message.reply_text(success_text, parse_mode=ParseMode.HTML)
         
         # Show main menu
@@ -405,12 +464,20 @@ async def show_test_question(update: Update, context: ContextTypes.DEFAULT_TYPE,
     questions = get_questions(lang)
     question_index = context.user_data['current_question']
     
-    if question_index >= len(questions):
+    # Safety check - should never exceed 14 (0-14 = 15 questions)
+    if question_index >= 15 or question_index >= len(questions):
         # All questions answered, save test
         await save_test(update, context, lang)
         return ConversationHandler.END
     
     question = questions[question_index]
+    
+    # Get the question image URL
+    question_images = [
+        question0_img, question1_img, question2_img, question3_img, question4_img,
+        question5_img, question6_img, question7_img, question8_img, question9_img,
+        question10_img, question11_img, question12_img, question13_img, question14_img
+    ]
     
     # Create keyboard with options
     keyboard = []
@@ -423,33 +490,37 @@ async def show_test_question(update: Update, context: ContextTypes.DEFAULT_TYPE,
     progress = f"<b>{get_text(lang, 'question')} {question_index + 1}/15</b>"
     
     if question_index == 0:
-        # First question
         text = f"🎯 {progress}\n\n{question['text']}"
     elif question_index == 14:
-        # Last question
         text = f"🏁 {progress} <i>({get_text(lang, 'last_question')})</i>\n\n{question['text']}"
     else:
         text = f"❓ {progress}\n\n{question['text']}"
     
-    if update.callback_query:
+    # Send photo with caption if image exists and is valid
+    if question_index < len(question_images) and question_images[question_index] and question_images[question_index].strip():
         try:
-            await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-        except:
-            # If edit fails, send new message
-            await context.bot.send_message(
+            await context.bot.send_photo(
                 chat_id=update.effective_chat.id,
-                text=text,
+                photo=question_images[question_index],
+                caption=text,
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
-    else:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=text,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML
-        )
+            return
+        except Exception as e:
+            logger.error(f"Error sending photo for question {question_index}: {e}")
+            # Fall through to text message
+    
+    # Send as text message (fallback or no image)
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.HTML
+    )
 
+
+    
 async def test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle test answer"""
     query = update.callback_query
@@ -462,60 +533,110 @@ async def test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question_index = context.user_data['current_question']
     context.user_data['test_answers'][question_index] = answer_index
     
+    logger.info(f"Question {question_index} answered with option {answer_index}. Total answers so far: {len(context.user_data['test_answers'])}")
+    
     # Move to next question
     context.user_data['current_question'] += 1
     
+    # Continue showing questions
     await show_test_question(update, context, lang)
+    
+    return CREATING_TEST
 
 async def save_test(update: Update, context: ContextTypes.DEFAULT_TYPE, lang: str):
-    """Save completed test"""
+    """Save completed test with answers in JSONB format"""
     user_id = update.effective_user.id
     test_id = str(uuid.uuid4())
     
     try:
-        # Save test
+        # Validate we have exactly 15 answers (0-14)
+        if len(context.user_data['test_answers']) != 15:
+            logger.error(f"Invalid number of answers: {len(context.user_data['test_answers'])}")
+            logger.error(f"Answers received: {context.user_data['test_answers']}")
+            error_text = get_text(lang, 'error')
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=error_text + f"\n\nDebug: Only {len(context.user_data['test_answers'])} answers received.",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        # Convert answers dict to proper format for JSONB
+        answers_jsonb = {}
+        for i in range(15):
+            if i in context.user_data['test_answers']:
+                answer_value = context.user_data['test_answers'][i]
+                # Validate answer is 0-3
+                if answer_value < 0 or answer_value > 3:
+                    logger.error(f"Invalid answer_index at question {i}: {answer_value}")
+                    continue
+                answers_jsonb[str(i)] = answer_value
+            else:
+                logger.error(f"Missing answer for question {i}")
+                error_text = get_text(lang, 'error')
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=error_text + f"\n\nDebug: Missing answer for question {i+1}.",
+                    parse_mode=ParseMode.HTML
+                )
+                return
+        
+        # Save test with answers as JSONB
         test_data = {
             'id': test_id,
             'user_id': str(user_id),
+            'answers': answers_jsonb,
             'created_at': datetime.now(timezone.utc).isoformat()
         }
-        supabase.table('tests').insert(test_data).execute()
         
-        # Save answers
-        for question_index, answer_index in context.user_data['test_answers'].items():
-            answer_data = {
-                'test_id': test_id,
-                'question_index': question_index,
-                'answer_index': answer_index
-            }
-            supabase.table('test_answers_owner').insert(answer_data).execute()
+        logger.info(f"Saving test {test_id} with answers: {answers_jsonb}")
+        supabase.table('tests').insert(test_data).execute()
         
         # Generate share link
         bot_username = context.bot.username
         share_link = f"https://t.me/{bot_username}?start=s_{test_id}"
         
+        # Get share text from translations
+        from share import SHARE_TRANSLATIONS
+        translations = SHARE_TRANSLATIONS.get(lang, SHARE_TRANSLATIONS['en'])
+        
+        share_text_plain = translations['share_test_text']
+        share_text_intro = translations['share_test_intro']
+        share_text_full = f"{share_text_intro}\n\n{share_link}\n\n{share_text_plain}"
+        share_text_encoded = urllib.parse.quote(share_text_full)
+        
         success_text = get_text(lang, 'test_created').format(link=share_link)
         
-        if update.callback_query:
-            await update.callback_query.edit_message_text(success_text, parse_mode=ParseMode.HTML)
-        else:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=success_text,
-                parse_mode=ParseMode.HTML
-            )
+        # Add share and back buttons
+        keyboard = [
+            [InlineKeyboardButton(
+                get_text(lang, 'share_test'),
+                url=f"https://t.me/share/url?url={share_link}&text={share_text_encoded}"
+            )],
+            [InlineKeyboardButton(
+                get_text(lang, 'back'),
+                callback_data='back_to_menu'
+            )]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=success_text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
         
     except Exception as e:
         logger.error(f"Error saving test: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         error_text = get_text(lang, 'error')
-        if update.callback_query:
-            await update.callback_query.edit_message_text(error_text, parse_mode=ParseMode.HTML)
-        else:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=error_text,
-                parse_mode=ParseMode.HTML
-            )
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=error_text,
+            parse_mode=ParseMode.HTML
+        )
 
 async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, test_id: str):
     """Start taking a friend's test"""
@@ -533,6 +654,38 @@ async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         
         # Get user language
         lang = get_user_language(user_id)
+        
+        # Check if user has already taken this test
+        existing_result = supabase.table('test_results').select('score').eq('test_id', test_id).eq('user_id', str(user_id)).execute()
+        
+        if existing_result.data:
+            # User already took the test
+            score = existing_result.data[0]['score']
+            
+            already_taken_text = {
+                'uz': f"✅ Siz bu testni allaqachon topshirgansiz!\n\n📊 Sizning natijangiz: <b>{score}%</b>",
+                'ru': f"✅ Вы уже проходили этот тест!\n\n📊 Ваш результат: <b>{score}%</b>",
+                'en': f"✅ You have already taken this test!\n\n📊 Your score: <b>{score}%</b>"
+            }
+            
+            keyboard = [
+                [InlineKeyboardButton(
+                    get_text(lang, 'create_your_test'),
+                    callback_data='create_test'
+                )],
+                [InlineKeyboardButton(
+                    get_text(lang, 'add_birthday_button'),
+                    callback_data='add_birthday'
+                )]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                already_taken_text.get(lang, already_taken_text['en']),
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            return
         
         # Initialize test taking
         context.user_data['taking_test_id'] = test_id
@@ -560,12 +713,19 @@ async def show_taking_test_question(update: Update, context: ContextTypes.DEFAUL
     questions = get_questions(lang)
     question_index = context.user_data['taking_test_question']
     
-    if question_index >= len(questions):
+    if question_index >= 15 or question_index >= len(questions):
         # All questions answered, calculate score
         await calculate_test_score(update, context, lang)
         return
     
     question = questions[question_index]
+    
+    # Get the question image URL
+    question_images = [
+        question0_img, question1_img, question2_img, question3_img, question4_img,
+        question5_img, question6_img, question7_img, question8_img, question9_img,
+        question10_img, question11_img, question12_img, question13_img, question14_img
+    ]
     
     # Create keyboard with options
     keyboard = []
@@ -584,10 +744,38 @@ async def show_taking_test_question(update: Update, context: ContextTypes.DEFAUL
     else:
         text = f"❓ {progress}\n\n{question['text']}"
     
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    # Send photo with caption if image exists
+    if question_index < len(question_images) and question_images[question_index]:
+        try:
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=question_images[question_index],
+                caption=text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as e:
+            logger.error(f"Error sending photo: {e}")
+            # Fallback to text message
+            if update.callback_query:
+                await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+            else:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=text,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
     else:
-        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        if update.callback_query:
+            await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        else:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
 
 async def taking_test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle answer from test taker"""
@@ -601,26 +789,53 @@ async def taking_test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
     question_index = context.user_data['taking_test_question']
     context.user_data['taking_test_answers'][question_index] = answer_index
     
+    logger.info(f"Taking test - Question {question_index} answered with option {answer_index}. Total answers: {len(context.user_data['taking_test_answers'])}")
+    
     # Move to next question
     context.user_data['taking_test_question'] += 1
     
     await show_taking_test_question(update, context, lang)
 
 async def calculate_test_score(update: Update, context: ContextTypes.DEFAULT_TYPE, lang: str):
-    """Calculate and show test score"""
+    """Calculate and show test score with action buttons"""
     user_id = update.effective_user.id
     test_id = context.user_data['taking_test_id']
     user_answers = context.user_data['taking_test_answers']
     
     try:
-        # Get owner's answers
-        result = supabase.table('test_answers_owner').select('*').eq('test_id', test_id).execute()
-        owner_answers = {item['question_index']: item['answer_index'] for item in result.data}
+        # Get owner's answers from JSONB column
+        result = supabase.table('tests').select('answers, user_id').eq('id', test_id).execute()
+        
+        if not result.data or not result.data[0].get('answers'):
+            logger.error("No answers found in test")
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=get_text(lang, 'error'),
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        # Parse JSONB answers
+        owner_answers_json = result.data[0]['answers']
+        test_owner_id = result.data[0]['user_id']
+        
+        if isinstance(owner_answers_json, str):
+            owner_answers_dict = json.loads(owner_answers_json)
+        else:
+            owner_answers_dict = owner_answers_json
+        
+        # Convert string keys to int for comparison
+        owner_answers = {int(k): v for k, v in owner_answers_dict.items()}
+        
+        logger.info(f"Owner answers: {owner_answers}")
+        logger.info(f"User answers: {user_answers}")
         
         # Calculate score
         correct = sum(1 for q, a in user_answers.items() if owner_answers.get(q) == a)
         total = len(user_answers)
         percentage = int((correct / total) * 100)
+        
+        logger.info(f"Score: {correct}/{total} = {percentage}%")
         
         # Save result
         result_data = {
@@ -631,7 +846,22 @@ async def calculate_test_score(update: Update, context: ContextTypes.DEFAULT_TYP
         }
         supabase.table('test_results').insert(result_data).execute()
         
-        # Show result
+        # Notify test owner about the result
+        try:
+            owner_lang = get_user_language(int(test_owner_id))
+            owner_notification = get_text(owner_lang, 'test_completed_notification').format(
+                user_name=update.effective_user.first_name or "Someone",
+                score=percentage
+            )
+            await context.bot.send_message(
+                chat_id=int(test_owner_id),
+                text=owner_notification,
+                parse_mode=ParseMode.HTML
+            )
+        except Exception as e:
+            logger.error(f"Error notifying test owner: {e}")
+        
+        # Show result with action buttons
         if percentage >= 80:
             level = get_text(lang, 'level_best_friend')
             emoji = "🌟"
@@ -651,17 +881,49 @@ async def calculate_test_score(update: Update, context: ContextTypes.DEFAULT_TYP
             level=level
         )
         
-        if update.callback_query:
-            await update.callback_query.edit_message_text(result_text, parse_mode=ParseMode.HTML)
-        else:
-            await update.message.reply_text(result_text, parse_mode=ParseMode.HTML)
+        # Add action buttons
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    get_text(lang, 'create_your_test'),
+                    callback_data='create_test'
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    get_text(lang, 'add_birthday_button'),
+                    callback_data='add_birthday'
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    get_text(lang, 'share_bot'),
+                    callback_data='share_bot'
+                )
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Always send as new message
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=result_text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
         
     except Exception as e:
         logger.error(f"Error calculating score: {e}")
-        await update.message.reply_text(get_text(lang, 'error'), parse_mode=ParseMode.HTML)
+        import traceback
+        logger.error(traceback.format_exc())
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=get_text(lang, 'error'),
+            parse_mode=ParseMode.HTML
+        )
 
 async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show user's tests and results"""
+    """Show user's tests with share and create buttons"""
     query = update.callback_query
     await query.answer()
     
@@ -669,37 +931,90 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = get_user_language(user_id)
     
     try:
-        # Get user's tests
-        tests_result = supabase.table('tests').select('*').eq('user_id', str(user_id)).execute()
+        # Get user's tests (limit to 1)
+        tests_result = supabase.table('tests').select('*').eq('user_id', str(user_id)).order('created_at', desc=True).limit(1).execute()
         
         if not tests_result.data:
-            await query.edit_message_text(get_text(lang, 'no_tests'), parse_mode=ParseMode.HTML)
+            # Empty list with create button
+            text = get_text(lang, 'no_tests')
+            
+            keyboard = [
+                [InlineKeyboardButton(
+                    get_text(lang, 'create_test'),
+                    callback_data='create_test'
+                )],
+                [InlineKeyboardButton(
+                    get_text(lang, 'back'),
+                    callback_data='back_to_menu'
+                )]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
             return
+        
+        test = tests_result.data[0]
+        bot_username = context.bot.username
+        share_link = f"https://t.me/{bot_username}?start=s_{test['id']}"
+        
+        # Get share text from translations
+        from share import SHARE_TRANSLATIONS
+        translations = SHARE_TRANSLATIONS.get(lang, SHARE_TRANSLATIONS['en'])
+        
+        share_text_plain = translations['share_test_text']
+        share_text_intro = translations['share_test_intro']
+        share_text_full = f"{share_text_intro}\n\n{share_link}\n\n{share_text_plain}"
+        share_text_encoded = urllib.parse.quote(share_text_full)
         
         text = get_text(lang, 'test_list') + "\n\n"
         
-        for test in tests_result.data:
-            # Get results for this test
-            results = supabase.table('test_results').select('*').eq('test_id', test['id']).execute()
-            
-            test_date = datetime.fromisoformat(test['created_at'].replace('Z', '+00:00'))
-            text += f"📊 <b>Test created:</b> {test_date.strftime('%Y-%m-%d')}\n"
-            text += f"   👥 <b>Participants:</b> {len(results.data)}\n"
-            
-            if results.data:
-                avg_score = sum(r['score'] for r in results.data) / len(results.data)
-                text += f"   📈 <b>Average score:</b> {avg_score:.0f}%\n"
-            
-            text += "\n"
+        # Get results for this test
+        results = supabase.table('test_results').select('score').eq('test_id', test['id']).execute()
         
-        # Add back button
-        keyboard = [[InlineKeyboardButton(get_text(lang, 'back'), callback_data='back_to_menu')]]
+        # Format test date
+        test_date = datetime.fromisoformat(test['created_at'].replace('Z', '+00:00'))
+        date_str = test_date.strftime('%d.%m.%Y')
+        
+        # Build test info
+        text += f"📝 <b>{get_text(lang, 'your_test')}</b> ({date_str})\n"
+        text += f"🔗 <b>{get_text(lang, 'link')}:</b> <code>{share_link}</code>\n"
+        text += f"👥 <b>{get_text(lang, 'participants')}:</b> {len(results.data)}\n"
+        
+        if results.data:
+            scores = [r['score'] for r in results.data]
+            avg_score = sum(scores) / len(scores)
+            max_score = max(scores)
+            min_score = min(scores)
+            
+            text += f"📊 <b>{get_text(lang, 'avg_score')}:</b> {avg_score:.0f}%\n"
+            text += f"🏆 <b>{get_text(lang, 'highest_score')}:</b> {max_score}%\n"
+            text += f"📉 <b>{get_text(lang, 'lowest_score')}:</b> {min_score}%\n"
+        else:
+            text += f"<i>{get_text(lang, 'no_participants')}</i>\n"
+        
+        # Add share button directly
+        keyboard = [
+            [InlineKeyboardButton(
+                get_text(lang, 'share_test'),
+                url=f"https://t.me/share/url?url={share_link}&text={share_text_encoded}"
+            )],
+            [InlineKeyboardButton(
+                get_text(lang, 'back'),
+                callback_data='back_to_menu'
+            )]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
         
     except Exception as e:
         logger.error(f"Error fetching tests: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         await query.edit_message_text(get_text(lang, 'error'), parse_mode=ParseMode.HTML)
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -799,7 +1114,6 @@ async def generate_wish_handler(update: Update, context: ContextTypes.DEFAULT_TY
         logger.error(f"Error generating wish: {e}")
         await query.edit_message_text(get_text(lang, 'error'), parse_mode=ParseMode.HTML)
 
-# Main function
 def main():
     """Start the bot"""
     # Create application
@@ -833,11 +1147,15 @@ def main():
     application.add_handler(CallbackQueryHandler(my_birthdays, pattern='^my_birthdays$'))
     application.add_handler(CallbackQueryHandler(my_tests, pattern='^my_tests$'))
     application.add_handler(CallbackQueryHandler(settings, pattern='^settings$'))
-    application.add_handler(CallbackQueryHandler(premium_info, pattern='^premium$'))
+    application.add_handler(CallbackQueryHandler(premium_info_handler, pattern='^premium$'))
     application.add_handler(CallbackQueryHandler(back_to_menu, pattern='^back_to_menu$'))
     application.add_handler(CallbackQueryHandler(show_language_selection, pattern='^change_language$'))
     application.add_handler(CallbackQueryHandler(generate_wish_handler, pattern='^wish_'))
     application.add_handler(CallbackQueryHandler(taking_test_answer, pattern='^taking_answer_'))
+    
+    # NEW: Share and Premium handlers
+    application.add_handler(CallbackQueryHandler(share_main, pattern='^share_bot$'))
+    application.add_handler(CallbackQueryHandler(subscribe_callback, pattern='^subscribe_'))
     
     # Set up daily birthday check (runs at 9 AM UTC)
     job_queue = application.job_queue

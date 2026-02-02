@@ -17,7 +17,7 @@ def get_questions(lang: str):
             },
             {
                 'text': "Mening ko'z rangim qanday?",
-                'options': ["👁️ Qo'ng'ir", "👁️ Ko'k", "👁️ Yashil", "👁️ Kulrang"]
+                'options': ["👁️ Qora", "👁️ Ko'k", "👁️ Yashil", "👁️ Kulrang"]
             },
             {
                 'text': "Dam olishni qayerda o'tkazishni yaxshi ko'raman?",
@@ -65,7 +65,7 @@ def get_questions(lang: str):
             },
             {
                 'text': "Orzuim qayerga sayohat qilish?",
-                'options': ["🗼 Parij", "🗽 Nyu-York", "🗾 Yaponiya", "🏛️ Italiya"]
+                'options': ["🗼 Parij", "🗽 Nyu-York", "🗾 Tokio", "🏛️ Rim"]
             }
         ],
         
@@ -80,7 +80,7 @@ def get_questions(lang: str):
             },
             {
                 'text': "Какой у меня цвет глаз?",
-                'options': ["👁️ Карие", "👁️ Голубые", "👁️ Зеленые", "👁️ Серые"]
+                'options': ["👁️ Черные", "👁️ Голубые", "👁️ Зеленые", "👁️ Серые"]
             },
             {
                 'text': "Где я люблю отдыхать?",
@@ -128,7 +128,7 @@ def get_questions(lang: str):
             },
             {
                 'text': "Куда я мечтаю поехать?",
-                'options': ["🗼 Париж", "🗽 Нью-Йорк", "🗾 Япония", "🏛️ Италия"]
+                'options': ["🗼 Париж", "🗽 Нью-Йорк", "🗾 Токио", "🏛️ Рим"]
             }
         ],
         
@@ -143,7 +143,7 @@ def get_questions(lang: str):
             },
             {
                 'text': "What color are my eyes?",
-                'options': ["👁️ Brown", "👁️ Blue", "👁️ Green", "👁️ Gray"]
+                'options': ["👁️ Black", "👁️ Blue", "👁️ Green", "👁️ Gray"]
             },
             {
                 'text': "Where do I like to vacation?",
@@ -191,7 +191,7 @@ def get_questions(lang: str):
             },
             {
                 'text': "Where do I dream of traveling?",
-                'options': ["🗼 Paris", "🗽 New York", "🗾 Japan", "🏛️ Italy"]
+                'options': ["🗼 Paris", "🗽 New York", "🗾 Tokio", "🏛️ Rome"]
             }
         ]
     }
