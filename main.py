@@ -849,8 +849,6 @@ async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         user_result = supabase.table('friends_users').select('*').eq('telegram_id', str(user_id)).execute()
         
         if not user_result.data:
-            # New user - need to select language first
-            # Store test_id to resume after language selection
             context.user_data['pending_test_id'] = test_id
             await show_language_selection(update, context)
             return
@@ -1117,12 +1115,6 @@ async def calculate_test_score(update: Update, context: ContextTypes.DEFAULT_TYP
                     callback_data='add_birthday'
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    get_text(lang, 'share_bot'),
-                    callback_data='share_bot'
-                )
-            ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
