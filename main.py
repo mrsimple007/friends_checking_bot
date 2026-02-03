@@ -635,6 +635,12 @@ async def create_test_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 get_text(lang, 'share_test'),
                 url=f"https://t.me/share/url?url={existing_link}&text={share_text_encoded}"
             )])
+            
+            # Add recreate button
+            keyboard.append([InlineKeyboardButton(
+                get_text(lang, 'recreate_test'),
+                callback_data='recreate_test'
+            )])
 
         keyboard.append([InlineKeyboardButton(get_text(lang, 'premium'), callback_data='premium')])
         keyboard.append([InlineKeyboardButton(get_text(lang, 'back'), callback_data='back_to_menu')])
@@ -659,6 +665,50 @@ async def create_test_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     return CREATING_TEST
 
+async def recreate_test(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Delete old test and start creating new one"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    lang = get_user_language(user_id)
+    
+    try:
+        # Delete old test and its results
+        old_test = supabase.table('tests').select('id').eq('user_id', str(user_id)).execute()
+        if old_test.data:
+            test_id = old_test.data[0]['id']
+            # Delete test results first
+            supabase.table('test_results').delete().eq('test_id', test_id).execute()
+            # Delete test
+            supabase.table('tests').delete().eq('id', test_id).execute()
+        
+        # Clear any existing test creation data
+        context.user_data.pop('test_answers', None)
+        context.user_data.pop('current_question', None)
+        context.user_data.pop('taking_test_id', None)
+        context.user_data.pop('taking_test_answers', None)
+        context.user_data.pop('taking_test_question', None)
+        
+        # Initialize test creation
+        context.user_data['test_answers'] = {}
+        context.user_data['current_question'] = 0
+        
+        # Show intro message
+        intro_text = get_text(lang, 'test_intro_creator')
+        await query.edit_message_text(intro_text, parse_mode=ParseMode.HTML)
+        
+        # Wait a bit, then show first question
+        await asyncio.sleep(1)
+        
+        # Show first question
+        await show_test_question(update, context, lang)
+        
+    except Exception as e:
+        logger.error(f"Error recreating test: {e}")
+        await query.edit_message_text(get_text(lang, 'error'), parse_mode=ParseMode.HTML)
+
+
 async def show_test_question(update: Update, context: ContextTypes.DEFAULT_TYPE, lang: str):
     """Show test question"""
     from test_questions import get_questions
@@ -681,10 +731,14 @@ async def show_test_question(update: Update, context: ContextTypes.DEFAULT_TYPE,
         question10_img, question11_img, question12_img, question13_img, question14_img
     ]
     
-    # Create keyboard with options
+    # Create keyboard with options - 2 buttons per row
     keyboard = []
-    for i, option in enumerate(question['options']):
-        keyboard.append([InlineKeyboardButton(option, callback_data=f'test_answer_{i}')])
+    for i in range(0, len(question['options']), 2):
+        row = []
+        row.append(InlineKeyboardButton(question['options'][i], callback_data=f'test_answer_{i}'))
+        if i + 1 < len(question['options']):
+            row.append(InlineKeyboardButton(question['options'][i + 1], callback_data=f'test_answer_{i + 1}'))
+        keyboard.append(row)
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -769,7 +823,7 @@ async def save_test(update: Update, context: ContextTypes.DEFAULT_TYPE, lang: st
             if i in context.user_data['test_answers']:
                 answer_value = context.user_data['test_answers'][i]
                 # Validate answer is 0-3
-                if answer_value < 0 or answer_value > 3:
+                if answer_value < 0 or answer_value > 6:
                     logger.error(f"Invalid answer_index at question {i}: {answer_value}")
                     continue
                 answers_jsonb[str(i)] = answer_value
@@ -871,6 +925,57 @@ async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             return
         
         test = result.data[0]
+        test_owner_id = test['user_id']
+        
+        # Check if user is taking their own test
+        if str(user_id) == test_owner_id:
+            own_test_messages = {
+                'uz': (
+                    "😄 <b>Bu sizning testingiz!</b>\n\n"
+                    "O'zingizni tekshirish yaxshi, lekin testni do'stlaringizga yuboring - "
+                    "ular sizni qanchalik yaxshi bilishini bilib oling! 🎯\n\n"
+                    "👇 Testni ulashing yoki boshqa test yarating:"
+                ),
+                'ru': (
+                    "😄 <b>Это ваш собственный тест!</b>\n\n"
+                    "Проверять себя - это хорошо, но лучше отправьте тест друзьям - "
+                    "узнайте, насколько хорошо они вас знают! 🎯\n\n"
+                    "👇 Поделитесь тестом или создайте новый:"
+                ),
+                'en': (
+                    "😄 <b>This is your own test!</b>\n\n"
+                    "Testing yourself is good, but better send it to your friends - "
+                    "find out how well they know you! 🎯\n\n"
+                    "👇 Share the test or create a new one:"
+                )
+            }
+            
+            bot_username = context.bot.username
+            share_link = f"https://t.me/{bot_username}?start=s_{test_id}"
+            
+            from share import SHARE_TRANSLATIONS
+            share_translations = SHARE_TRANSLATIONS.get(lang, SHARE_TRANSLATIONS['en'])
+            share_text_full = f"{share_translations['share_test_intro']}\n\n{share_link}\n\n{share_translations['share_test_text']}"
+            share_text_encoded = urllib.parse.quote(share_text_full)
+            
+            keyboard = [
+                [InlineKeyboardButton(
+                    get_text(lang, 'share_test'),
+                    url=f"https://t.me/share/url?url={share_link}&text={share_text_encoded}"
+                )],
+                [InlineKeyboardButton(
+                    get_text(lang, 'back'),
+                    callback_data='back_to_menu'
+                )]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.message.reply_text(
+                own_test_messages.get(lang, own_test_messages['en']),
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            return
         
         # Check if user has already taken this test
         existing_result = supabase.table('test_results').select('score').eq('test_id', test_id).eq('user_id', str(user_id)).execute()
@@ -880,10 +985,62 @@ async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             score = existing_result.data[0]['score']
             logger.info(f"TEST_ALREADY_TAKEN: User {user_id} already took test {test_id} | Score: {score}%")
 
+            # Get test creator's name
+            creator_result = supabase.table('friends_users').select('first_name, username').eq('telegram_id', test_owner_id).execute()
+            creator_name = creator_result.data[0]['first_name'] if creator_result.data else "friend"
+
+            # Determine friendship level
+            if score >= 80:
+                level_emoji = "🌟"
+                level_text = {
+                    'uz': "Eng yaqin do'st",
+                    'ru': "Лучший друг",
+                    'en': "Best Friend"
+                }
+            elif score >= 60:
+                level_emoji = "💫"
+                level_text = {
+                    'uz': "Yaqin do'st",
+                    'ru': "Близкий друг",
+                    'en': "Close Friend"
+                }
+            elif score >= 40:
+                level_emoji = "✨"
+                level_text = {
+                    'uz': "Do'st",
+                    'ru': "Друг",
+                    'en': "Friend"
+                }
+            else:
+                level_emoji = "⭐"
+                level_text = {
+                    'uz': "Tanish",
+                    'ru': "Знакомый",
+                    'en': "Acquaintance"
+                }
+
             already_taken_text = {
-                'uz': f"✅ Siz bu testni allaqachon topshirgansiz!\n\n📊 Sizning natijangiz: <b>{score}%</b>",
-                'ru': f"✅ Вы уже проходили этот тест!\n\n📊 Ваш результат: <b>{score}%</b>",
-                'en': f"✅ You have already taken this test!\n\n📊 Your score: <b>{score}%</b>"
+                'uz': (
+                    f"✅ <b>Siz bu testni allaqachon topshirgansiz!</b>\n\n"
+                    f"👤 <b>Test egasi:</b> {creator_name}\n"
+                    f"📊 <b>Sizning natijangiz:</b> {score}%\n"
+                    f"{level_emoji} <b>Do'stlik darajasi:</b> {level_text['uz']}\n\n"
+                    f"💡 <i>O'zingizning testingizni yaratib, do'stlaringizni sinab ko'ring!</i>"
+                ),
+                'ru': (
+                    f"✅ <b>Вы уже проходили этот тест!</b>\n\n"
+                    f"👤 <b>Автор теста:</b> {creator_name}\n"
+                    f"📊 <b>Ваш результат:</b> {score}%\n"
+                    f"{level_emoji} <b>Уровень дружбы:</b> {level_text['ru']}\n\n"
+                    f"💡 <i>Создайте свой тест и проверьте своих друзей!</i>"
+                ),
+                'en': (
+                    f"✅ <b>You have already taken this test!</b>\n\n"
+                    f"👤 <b>Test creator:</b> {creator_name}\n"
+                    f"📊 <b>Your score:</b> {score}%\n"
+                    f"{level_emoji} <b>Friendship level:</b> {level_text['en']}\n\n"
+                    f"💡 <i>Create your own test and challenge your friends!</i>"
+                )
             }
             
             keyboard = [
@@ -924,7 +1081,6 @@ async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         logger.error(f"Error starting test: {e}")
         await update.message.reply_text("❌ Error loading test", parse_mode=ParseMode.HTML)
 
-
 async def show_taking_test_question(update: Update, context: ContextTypes.DEFAULT_TYPE, lang: str):
     """Show question for test taker"""
     from test_questions import get_questions
@@ -946,10 +1102,14 @@ async def show_taking_test_question(update: Update, context: ContextTypes.DEFAUL
         question10_img, question11_img, question12_img, question13_img, question14_img
     ]
     
-    # Create keyboard with options
+    # Create keyboard with options - 2 buttons per row
     keyboard = []
-    for i, option in enumerate(question['options']):
-        keyboard.append([InlineKeyboardButton(option, callback_data=f'taking_answer_{i}')])
+    for i in range(0, len(question['options']), 2):
+        row = []
+        row.append(InlineKeyboardButton(question['options'][i], callback_data=f'taking_answer_{i}'))
+        if i + 1 < len(question['options']):
+            row.append(InlineKeyboardButton(question['options'][i + 1], callback_data=f'taking_answer_{i + 1}'))
+        keyboard.append(row)
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -995,6 +1155,7 @@ async def show_taking_test_question(update: Update, context: ContextTypes.DEFAUL
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
+
 
 async def taking_test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle answer from test taker"""
@@ -1386,7 +1547,8 @@ def main():
     # NEW: Share and Premium handlers
     application.add_handler(CallbackQueryHandler(share_main, pattern='^share_bot$'))
     application.add_handler(CallbackQueryHandler(subscribe_callback, pattern='^subscribe_'))
-    
+    application.add_handler(CallbackQueryHandler(recreate_test, pattern='^recreate_test$'))
+
     # Set up daily birthday check (runs at 9 AM UTC)
     job_queue = application.job_queue
     job_queue.run_daily(check_birthdays, time=datetime.strptime("09:00", "%H:%M").time())

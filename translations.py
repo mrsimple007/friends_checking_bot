@@ -32,7 +32,7 @@ TRANSLATIONS = {
         
         'processing': '⏳ <i>Qayta ishlanmoqda...</i>',
         
-        'birthday_parse_error': '❌ <b>Ma\'lumot noto\'g\'ri kiritildi</b>\n\nAfsus, tug\'ilgan kun ma\'lumotini tushunib bo\'lmadi. Iltimos, to\'g\'ri formatda qaytadan kiriting.\n\n<b>To\'g\'ri formatlar:</b>\n• Ism 12.03\n• Ism 12-mart\n• Ism 1999-07-04',
+        'birthday_parse_error': '❌ <b>Ma\'lumot noto\'g\'ri kiritildi</b>\n\nAfsus, tug\'ilgan kun ma\'lumotini tushunib bo\'lmadi. Iltimos, to\'g\'ri formatda qaytadan kiriting. /start\n\n<b>To\'g\'ri formatlar:</b>\n• Ism 12.03\n• Ism 12-mart\n• Ism 1999-07-04',
         
         'birthday_saved': '✅ <b>Muvaffaqiyatli saqlandi!</b>\n\n🎂 <b>{name}</b> — {day}.{month}\n\n<i>Tug\'ilgan kun yaqinlashganda sizga eslatma yuboraman!</i>',
         
@@ -71,7 +71,7 @@ TRANSLATIONS = {
         
         'premium_info': '⭐ <b>Premium obuna</b>\n\nPremium a\'zolar uchun maxsus imkoniyatlar:\n\n🎂 <b>Cheksiz tug\'ilgan kunlar</b> — istalgancha qo\'shing\n✨ <b>Cheksiz testlar</b> — yaratishda chegara yo\'q\n🎨 <b>Maxsus dizaynlar</b> — o\'ziga xos ko\'rinish\n📊 <b>Batafsil statistika</b> — har bir testning to\'liq tahlili\n\n<i>Premium rejalar tez orada!</i> 🚀',
         
-        'error': '❌ <b>Xatolik yuz berdi</b>\n\nAfsus, nimadir noto\'g\'ri ketdi. Iltimos, bir ozdan so\'ng qaytadan urinib ko\'ring.\n\n<i>Agar muammo takrorlansa, yordam xizmatiga murojaat qiling.</i>',
+        'error': '❌ <b>Xatolik yuz berdi</b>\n\nAfsus, nimadir noto\'g\'ri ketdi. Iltimos, bir ozdan so\'ng qaytadan urinib ko\'ring. /start \n\n<i>Agar muammo takrorlansa, yordam xizmatiga murojaat qiling.</i>',
         
         'cancelled': '❌ <b>Bekor qilindi</b>\n\n<i>Bosh menyuga qaytdingiz.</i>',
         
@@ -96,6 +96,18 @@ TRANSLATIONS = {
         'test_completed_notification': '🎉 <b>Yangi natija!</b>\n\n<b>{user_name}</b> sizning testingizni yechdi.\n\n📊 <b>Natija:</b> {score}%',
         'your_test': 'Sizning testingiz',
         'share_test': '📤 Testni Ulashish',
+"recreate_test": '🔄 Testni qayta yaratish',
+
+
+
+
+
+
+
+
+
+
+
     },
     
     'ru': {
@@ -195,6 +207,10 @@ TRANSLATIONS = {
         'test_completed_notification': '🎉 <b>Новый результат!</b>\n\n<b>{user_name}</b> прошел ваш тест.\n\n📊 <b>Результат:</b> {score}%',
         'your_test': 'Ваш тест',
         'share_test': '📤 Поделиться',
+"recreate_test": '🔄 Пересоздать тест',
+
+
+
     },
     
     'en': {
@@ -250,6 +266,10 @@ TRANSLATIONS = {
         'last_question': 'Last question',
         
         'test_created': '🎊 <b>Your test is ready!</b>\n\nAwesome! Your friendship test has been successfully created.\n\n📎 <b>Share link:</b>\n<code>{link}</code>\n\n<i>💡 Send this link to your friends. They\'ll take the test and find out how well they know you!</i>',
+        
+"recreate_test": '🔄 Recreate Test',
+
+
         
         'test_result_title': 'Result',
         'test_result': '🎯 <b>Your result:</b> {score}%\n\n👤 <b>Friendship level:</b> {level}\n\n<i>Your friend answered {score}% correctly about you!</i>',
