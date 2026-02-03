@@ -134,3 +134,28 @@ NOTIFY_TEST_CREATOR = True
 DELETE_INACTIVE_TESTS_AFTER_DAYS = 180
 DELETE_OLD_ANALYTICS_AFTER_DAYS = 90
 
+
+import traceback
+from functools import wraps
+
+def log_user_action(action_name: str):
+    """Decorator to log user actions"""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
+            user = update.effective_user
+            user_id = user.id if user else "Unknown"
+            username = user.username if user else "Unknown"
+            
+            logger.info(f"ACTION: {action_name} | User: {user_id} (@{username})")
+            
+            try:
+                result = await func(update, context, *args, **kwargs)
+                logger.info(f"SUCCESS: {action_name} | User: {user_id}")
+                return result
+            except Exception as e:
+                logger.error(f"ERROR: {action_name} | User: {user_id} | Error: {str(e)}")
+                logger.error(traceback.format_exc())
+                raise
+        return wrapper
+    return decorator

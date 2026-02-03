@@ -211,6 +211,8 @@ def is_user_premium(user_id: int) -> bool:
     return False
 
 # Bot Handlers
+@log_user_action("BOT_START")
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
     user = update.effective_user
@@ -221,9 +223,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check if this is a test link
     if context.args and context.args[0].startswith('s_'):
         test_id = context.args[0][2:]
-        # Start test taking flow
+        logger.info(f"USER_ACTION: User {user.id} (@{user.username}) started taking test {test_id}")
         await start_taking_test(update, context, test_id)
         return
+    else:
+        logger.info(f"USER_ACTION: User {user.id} (@{user.username}) started bot (regular start)")
+   
     
     # Check if user exists
     try:
@@ -272,22 +277,36 @@ async def show_language_selection(update: Update, context: ContextTypes.DEFAULT_
     """Show language selection keyboard"""
     keyboard = [
         [
-            InlineKeyboardButton("🇺🇿 O'zbek", callback_data='lang_uz'),
+            InlineKeyboardButton("🇺🇿 O‘zbekcha", callback_data='lang_uz'),
             InlineKeyboardButton("🇷🇺 Русский", callback_data='lang_ru'),
         ],
         [InlineKeyboardButton("🇬🇧 English", callback_data='lang_en')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
     message = (
-        "🌍 <b>Choose your language / Tilni tanlang / Выберите язык</b>\n\n"
-        "This bot helps you remember birthdays and create fun friendship tests!"
+        "🌍 <b>Tilni tanlang / Выберите язык / Choose your language</b>\n\n"
+        "🇺🇿 Bu bot do‘stlaringizning tug‘ilgan kunlarini eslab qolishga 🎂 "
+        "va qiziqarli do‘stlik testlarini yaratishga yordam beradi 🫶\n\n"
+        "🇷🇺 Этот бот помогает запоминать дни рождения друзей 🎉 "
+        "и создавать весёлые тесты на дружбу 🤝\n\n"
+        "🇬🇧 This bot helps you remember your friends’ birthdays 🎈 "
+        "and create fun friendship tests 💖\n\n"
+        "👇 <i>Iltimos, davom etish uchun tilni tanlang</i>"
     )
-    
+
     if update.callback_query:
-        await update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        await update.callback_query.edit_message_text(
+            message,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
     else:
-        await update.message.reply_text(message, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        await update.message.reply_text(
+            message,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML
+        )
 
 async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle language selection"""
@@ -296,9 +315,93 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     lang = query.data.split('_')[1]
     user = update.effective_user
-    
+
+    logger.info(f"LANGUAGE_SELECTED: User {user.id} (@{user.username}) selected language: {lang}")
+
     # Save user with selected language
     save_user(user.id, user.username or '', lang, first_name=user.first_name or '', last_name=user.last_name or '')
+    
+    # Check if there's a pending test
+    if 'pending_test_id' in context.user_data:
+        test_id = context.user_data.pop('pending_test_id')
+        
+        # Show welcome message
+        welcome_text = get_text(lang, 'welcome')
+        await query.edit_message_text(welcome_text, parse_mode=ParseMode.HTML)
+        
+        await asyncio.sleep(1)
+        
+        try:
+            result = supabase.table('tests').select('*').eq('id', test_id).execute()
+            
+            if not result.data:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="❌ Test not found",
+                    parse_mode=ParseMode.HTML
+                )
+                return
+            
+            # Check if user already took this test
+            existing_result = supabase.table('test_results').select('score').eq('test_id', test_id).eq('user_id', str(user.id)).execute()
+            
+            if existing_result.data:
+                score = existing_result.data[0]['score']
+                logger.info(f"TEST_ALREADY_TAKEN: User {user.id} already took test {test_id} | Score: {score}%")
+
+                already_taken_text = {
+                    'uz': f"✅ Siz bu testni allaqachon topshirgansiz!\n\n📊 Sizning natijangiz: <b>{score}%</b>",
+                    'ru': f"✅ Вы уже проходили этот тест!\n\n📊 Ваш результат: <b>{score}%</b>",
+                    'en': f"✅ You have already taken this test!\n\n📊 Your score: <b>{score}%</b>"
+                }
+                
+                keyboard = [
+                    [InlineKeyboardButton(
+                        get_text(lang, 'create_your_test'),
+                        callback_data='create_test'
+                    )],
+                    [InlineKeyboardButton(
+                        get_text(lang, 'add_birthday_button'),
+                        callback_data='add_birthday'
+                    )]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=already_taken_text.get(lang, already_taken_text['en']),
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.HTML
+                )
+                return
+            
+            # Initialize test taking
+            context.user_data['taking_test_id'] = test_id
+            context.user_data['taking_test_answers'] = {}
+            context.user_data['taking_test_question'] = 0
+            
+            # Show intro
+            intro_text = get_text(lang, 'test_intro')
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=intro_text,
+                parse_mode=ParseMode.HTML
+            )
+            
+            # Wait a bit before showing first question
+            await asyncio.sleep(1)
+            
+            # Show first question
+            await show_taking_test_question(update, context, lang)
+            
+        except Exception as e:
+            logger.error(f"Error starting test after language selection: {e}")
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="❌ Error loading test",
+                parse_mode=ParseMode.HTML
+            )
+        return
     
     # Show welcome message
     welcome_text = get_text(lang, 'welcome')
@@ -378,21 +481,26 @@ async def add_birthday_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     return ADDING_BIRTHDAY
 
+@log_user_action("ADD_BIRTHDAY")
 async def process_birthday(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Process birthday input"""
     user_id = update.effective_user.id
     lang = get_user_language(user_id)
     text = update.message.text
     
-    # Parse with AI
+    logger.info(f"BIRTHDAY_INPUT: User {user_id} submitted text: '{text[:50]}...'")
+    
     await update.message.reply_text(get_text(lang, 'processing'), parse_mode=ParseMode.HTML)
     
     parsed = parse_birthday_with_ai(text, lang)
     
     if not parsed:
+        logger.warning(f"BIRTHDAY_PARSE_FAILED: User {user_id} | Text: '{text[:50]}...'")
         await update.message.reply_text(get_text(lang, 'birthday_parse_error'), parse_mode=ParseMode.HTML)
         return ADDING_BIRTHDAY
     
+    logger.info(f"BIRTHDAY_PARSED: User {user_id} | Count: {len(parsed)} | Names: {[b['name'] for b in parsed]}")
+ 
     # Check limits
     birthday_count = get_user_birthday_count(user_id)
     is_premium = is_user_premium(user_id)
@@ -435,6 +543,7 @@ async def process_birthday(update: Update, context: ContextTypes.DEFAULT_TYPE):
             success_text = f"✅ <b>Saqlandi!</b>\n\n🎂 {saved_count} ta tug'ilgan kun muvaffaqiyatli saqlandi!"
         
         await update.message.reply_text(success_text, parse_mode=ParseMode.HTML)
+        logger.info(f"BIRTHDAY_SAVED: User {user_id} | Count: {saved_count} | Names: {[b['name'] for b in parsed]}")
         
         # Show main menu
         await show_main_menu(update, context, lang)
@@ -735,6 +844,26 @@ async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     """Start taking a friend's test"""
     user_id = update.effective_user.id
     
+    # Check if user exists in database
+    try:
+        user_result = supabase.table('friends_users').select('*').eq('telegram_id', str(user_id)).execute()
+        
+        if not user_result.data:
+            # New user - need to select language first
+            # Store test_id to resume after language selection
+            context.user_data['pending_test_id'] = test_id
+            await show_language_selection(update, context)
+            return
+        
+        lang = user_result.data[0]['language']
+        
+    except Exception as e:
+        logger.error(f"Error checking user: {e}")
+        # If error, assume new user
+        context.user_data['pending_test_id'] = test_id
+        await show_language_selection(update, context)
+        return
+    
     # Check if test exists
     try:
         result = supabase.table('tests').select('*').eq('id', test_id).execute()
@@ -745,16 +874,14 @@ async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         
         test = result.data[0]
         
-        # Get user language
-        lang = get_user_language(user_id)
-        
         # Check if user has already taken this test
         existing_result = supabase.table('test_results').select('score').eq('test_id', test_id).eq('user_id', str(user_id)).execute()
         
         if existing_result.data:
             # User already took the test
             score = existing_result.data[0]['score']
-            
+            logger.info(f"TEST_ALREADY_TAKEN: User {user_id} already took test {test_id} | Score: {score}%")
+
             already_taken_text = {
                 'uz': f"✅ Siz bu testni allaqachon topshirgansiz!\n\n📊 Sizning natijangiz: <b>{score}%</b>",
                 'ru': f"✅ Вы уже проходили этот тест!\n\n📊 Ваш результат: <b>{score}%</b>",
@@ -798,6 +925,7 @@ async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     except Exception as e:
         logger.error(f"Error starting test: {e}")
         await update.message.reply_text("❌ Error loading test", parse_mode=ParseMode.HTML)
+
 
 async def show_taking_test_question(update: Update, context: ContextTypes.DEFAULT_TYPE, lang: str):
     """Show question for test taker"""
@@ -877,12 +1005,12 @@ async def taking_test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     lang = get_user_language(update.effective_user.id)
     answer_index = int(query.data.split('_')[2])
-    
+    user_id = update.effective_user.id
     # Save answer
     question_index = context.user_data['taking_test_question']
     context.user_data['taking_test_answers'][question_index] = answer_index
     
-    logger.info(f"Taking test - Question {question_index} answered with option {answer_index}. Total answers: {len(context.user_data['taking_test_answers'])}")
+    logger.info(f"Taking test - Question {question_index} answered with option {answer_index} by user {user_id}. Total answers: {len(context.user_data['taking_test_answers'])}")
     
     # Move to next question
     context.user_data['taking_test_question'] += 1
@@ -929,6 +1057,7 @@ async def calculate_test_score(update: Update, context: ContextTypes.DEFAULT_TYP
         percentage = int((correct / total) * 100)
         
         logger.info(f"Score: {correct}/{total} = {percentage}%")
+        logger.info(f"TEST_COMPLETED: User {user_id} | Test {test_id} | Score: {percentage}% ({correct}/{total})")
         
         # Save result
         result_data = {

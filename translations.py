@@ -80,9 +80,9 @@ TRANSLATIONS = {
         'generate_wish': '✨ Tabrik yaratish',
         'generating_wish': '⏳ <i>Maxsus tabrik tayyorlanmoqda...</i>',
         
-        'create_your_test': '✨ O\'z testim',
-        'add_birthday_button': '🎂 Qo\'shish',
-        'share_bot': '📤 Ulashish',
+        'create_your_test': '✨ O\'zimning testim',
+        'add_birthday_button': '🎂 Tug\'ilgan kun qo\'shish',
+        'share_bot': '📤 Testni Ulashish',
         'share_tests': '📤 Testni ulashish',
         'create_new_test': '➕ Yangi test',
         'test_number': 'Test #{num}',
@@ -93,9 +93,9 @@ TRANSLATIONS = {
         'lowest_score': 'Eng past',
         'top_scorer': 'Eng yaxshi',
         'no_participants': 'Hali hech kim yechmagan',
-        'test_completed_notification': '🎉 <b>Yangi natija!</b>\n\n<b>{user_name}</b> sizning testingizni topshirdi.\n\n📊 <b>Natija:</b> {score}%',
+        'test_completed_notification': '🎉 <b>Yangi natija!</b>\n\n<b>{user_name}</b> sizning testingizni yechdi.\n\n📊 <b>Natija:</b> {score}%',
         'your_test': 'Sizning testingiz',
-        'share_test': '📤 Ulashish',
+        'share_test': '📤 Testni Ulashish',
     },
     
     'ru': {
