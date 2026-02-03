@@ -16,8 +16,9 @@ from telegram.ext import (
 from telegram.constants import ParseMode
 from config import supabase, model, TELEGRAM_BOT_TOKEN, FREE_BIRTHDAY_LIMIT, FREE_TEST_LIMIT
 from share import share_main
-from balance import premium_info_handler, subscribe_callback
+from balance import premium_info_handler, subscribe_callback, approve_premium_payment, decline_premium_payment
 import urllib.parse
+from admin import *
 
 # Logging setup
 logging.basicConfig(
@@ -70,22 +71,24 @@ def get_user_language(user_id: int) -> str:
         logger.error(f"Error getting user language: {e}")
     return 'en'
 
-def save_user(telegram_id: int, username: str, language: str, is_premium: bool = False):
+def save_user(telegram_id: int, username: str, language: str, is_premium: bool = False, first_name: str = None, last_name: str = None):
     """Save or update user in database"""
     try:
         user_data = {
             'telegram_id': str(telegram_id),
             'username': username,
+            'first_name': first_name or '',
+            'last_name': last_name or '',
             'language': language,
             'is_premium': is_premium,
             'created_at': datetime.now(timezone.utc).isoformat()
         }
         
-        # Upsert user
         supabase.table('friends_users').upsert(user_data).execute()
         logger.info(f"User {telegram_id} saved with language {language}")
     except Exception as e:
         logger.error(f"Error saving user: {e}")
+
 
 def parse_birthday_with_ai(text: str, lang: str) -> Optional[List[Dict]]:
     """Parse birthday text using Gemini AI - can handle single or multiple birthdays"""
@@ -212,6 +215,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
     user = update.effective_user
     
+    # Clear any ongoing conversation data
+    context.user_data.clear()
+    
     # Check if this is a test link
     if context.args and context.args[0].startswith('s_'):
         test_id = context.args[0][2:]
@@ -224,8 +230,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = supabase.table('friends_users').select('*').eq('telegram_id', str(user.id)).execute()
         
         if result.data:
-            # User exists, show main menu
             lang = result.data[0]['language']
+
+            if user.id in NOTIFICATION_ADMIN_IDS:
+                total_users, total_birthdays, total_tests, total_results, todays_active, premium_count = await asyncio.gather(
+                    get_total_users(),
+                    get_total_birthdays(),
+                    get_total_tests(),
+                    get_total_test_results(),
+                    get_todays_active_users(),
+                    get_premium_users()
+                )
+
+                admin_message = (
+                    "👑 <b>Admin Dashboard</b>\n\n"
+                    f"👤 <b>Total Users:</b> {total_users}\n"
+                    f"💎 <b>Premium Users:</b> {premium_count}\n"
+                    f"👥 <b>Active Today:</b> {todays_active}\n\n"
+                    f"📈 <b>Content:</b>\n"
+                    f"  🎂 Birthdays saved: {total_birthdays}\n"
+                    f"  📝 Tests created: {total_tests}\n"
+                    f"  ✅ Tests taken: {total_results}\n\n"
+                    f"📊 <b>Averages:</b>\n"
+                    f"  • Birthdays / user: {total_birthdays / total_users if total_users else 0:.1f}\n"
+                    f"  • Tests taken / test: {total_results / total_tests if total_tests else 0:.1f}"
+                )
+
+                await update.message.reply_text(
+                    text=admin_message,
+                    parse_mode=ParseMode.HTML
+                )
             await show_main_menu(update, context, lang)
         else:
             # New user, show language selection
@@ -264,7 +298,7 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     # Save user with selected language
-    save_user(user.id, user.username or user.first_name, lang)
+    save_user(user.id, user.username or '', lang, first_name=user.first_name or '', last_name=user.last_name or '')
     
     # Show welcome message
     welcome_text = get_text(lang, 'welcome')
@@ -272,6 +306,23 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Show main menu
     await show_main_menu(update, context, lang)
+
+def format_display_name(row: dict) -> str:
+    """Build: 'First Last (@username)' with fallbacks"""
+    first = row.get('first_name') or ''
+    last  = row.get('last_name')  or ''
+    uname = row.get('username')   or ''
+
+    full = f"{first} {last}".strip()
+
+    if full and uname:
+        return f"{full} (@{uname})"
+    if full:
+        return full
+    if uname:
+        return f"@{uname}"
+    return f"User {row.get('telegram_id', '?')}"
+
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, lang: str):
     """Show main menu"""
@@ -406,7 +457,16 @@ async def my_birthdays(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = supabase.table('birthdays').select('*').eq('user_id', str(user_id)).execute()
         
         if not result.data:
-            await query.edit_message_text(get_text(lang, 'no_birthdays'), parse_mode=ParseMode.HTML)
+            keyboard = [
+                [InlineKeyboardButton(get_text(lang, 'add_birthday'), callback_data='add_birthday')],
+                [InlineKeyboardButton(get_text(lang, 'back'), callback_data='back_to_menu')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await query.edit_message_text(
+                get_text(lang, 'no_birthdays'),
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
             return
         
         # Format birthday list
@@ -432,13 +492,46 @@ async def create_test_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = get_user_language(user_id)
     
+    # Clear any existing test creation data
+    context.user_data.pop('test_answers', None)
+    context.user_data.pop('current_question', None)
+    context.user_data.pop('taking_test_id', None)
+    context.user_data.pop('taking_test_answers', None)
+    context.user_data.pop('taking_test_question', None)
+    
     # Check limits
     test_count = get_user_test_count(user_id)
     is_premium = is_user_premium(user_id)
     
     if not is_premium and test_count >= FREE_TEST_LIMIT:
+        # Still show existing test link so user can share it
+        existing_test = supabase.table('tests').select('id').eq('user_id', str(user_id)).order('created_at', desc=True).limit(1).execute()
+
         limit_text = get_text(lang, 'test_limit_reached')
-        await query.edit_message_text(limit_text, parse_mode=ParseMode.HTML)
+
+        keyboard = []
+
+        if existing_test.data:
+            bot_username = context.bot.username
+            existing_link = f"https://t.me/{bot_username}?start=s_{existing_test.data[0]['id']}"
+
+            from share import SHARE_TRANSLATIONS
+            share_translations = SHARE_TRANSLATIONS.get(lang, SHARE_TRANSLATIONS['en'])
+            share_text_full = f"{share_translations['share_test_intro']}\n\n{existing_link}\n\n{share_translations['share_test_text']}"
+            share_text_encoded = urllib.parse.quote(share_text_full)
+
+            limit_text += f"\n\n🔗 <b>{get_text(lang, 'link')}:</b>\n<code>{existing_link}</code>"
+
+            keyboard.append([InlineKeyboardButton(
+                get_text(lang, 'share_test'),
+                url=f"https://t.me/share/url?url={existing_link}&text={share_text_encoded}"
+            )])
+
+        keyboard.append([InlineKeyboardButton(get_text(lang, 'premium'), callback_data='premium')])
+        keyboard.append([InlineKeyboardButton(get_text(lang, 'back'), callback_data='back_to_menu')])
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(limit_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
         return ConversationHandler.END
     
     # Initialize test creation
@@ -972,27 +1065,38 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         text = get_text(lang, 'test_list') + "\n\n"
         
-        # Get results for this test
-        results = supabase.table('test_results').select('score').eq('test_id', test['id']).execute()
-        
+        # Get results with user info
+        results = supabase.table('test_results').select('score, user_id').eq('test_id', test['id']).execute()
+
         # Format test date
         test_date = datetime.fromisoformat(test['created_at'].replace('Z', '+00:00'))
         date_str = test_date.strftime('%d.%m.%Y')
-        
+
         # Build test info
         text += f"📝 <b>{get_text(lang, 'your_test')}</b> ({date_str})\n"
         text += f"🔗 <b>{get_text(lang, 'link')}:</b> <code>{share_link}</code>\n"
-        text += f"👥 <b>{get_text(lang, 'participants')}:</b> {len(results.data)}\n"
-        
+        text += f"👥 <b>{get_text(lang, 'participants')}:</b> {len(results.data)}\n\n"
+
         if results.data:
             scores = [r['score'] for r in results.data]
             avg_score = sum(scores) / len(scores)
             max_score = max(scores)
             min_score = min(scores)
-            
+
             text += f"📊 <b>{get_text(lang, 'avg_score')}:</b> {avg_score:.0f}%\n"
             text += f"🏆 <b>{get_text(lang, 'highest_score')}:</b> {max_score}%\n"
-            text += f"📉 <b>{get_text(lang, 'lowest_score')}:</b> {min_score}%\n"
+            text += f"📉 <b>{get_text(lang, 'lowest_score')}:</b> {min_score}%\n\n"
+
+            # List each participant with name + score
+            text += f"<b>👤 {get_text(lang, 'participants')}:</b>\n"
+            for r in results.data:
+                try:
+                    user_row = supabase.table('friends_users').select('first_name, last_name, username, telegram_id').eq('telegram_id', r['user_id']).execute()
+                    display_name = format_display_name(user_row.data[0]) if user_row.data else f"User {r['user_id']}"
+                except Exception:
+                    display_name = f"User {r['user_id']}"
+                text += f"  • <b>{display_name}</b> — {r['score']}%\n"
+
         else:
             text += f"<i>{get_text(lang, 'no_participants')}</i>\n"
         
@@ -1128,7 +1232,9 @@ def main():
         states={
             ADDING_BIRTHDAY: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_birthday)]
         },
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('start', start)],
+        allow_reentry=True,
+        per_message=False
     )
     application.add_handler(birthday_conv)
     
@@ -1138,7 +1244,9 @@ def main():
         states={
             CREATING_TEST: [CallbackQueryHandler(test_answer, pattern='^test_answer_')]
         },
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('start', start)],
+        allow_reentry=True,
+        per_message=False
     )
     application.add_handler(test_conv)
     
@@ -1152,7 +1260,8 @@ def main():
     application.add_handler(CallbackQueryHandler(show_language_selection, pattern='^change_language$'))
     application.add_handler(CallbackQueryHandler(generate_wish_handler, pattern='^wish_'))
     application.add_handler(CallbackQueryHandler(taking_test_answer, pattern='^taking_answer_'))
-    
+    application.add_handler(CallbackQueryHandler(approve_premium_payment, pattern='^approve_premium_'))
+    application.add_handler(CallbackQueryHandler(decline_premium_payment, pattern='^decline_premium_'))
     # NEW: Share and Premium handlers
     application.add_handler(CallbackQueryHandler(share_main, pattern='^share_bot$'))
     application.add_handler(CallbackQueryHandler(subscribe_callback, pattern='^subscribe_'))

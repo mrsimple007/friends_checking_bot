@@ -92,7 +92,7 @@ TRANSLATIONS = {
         'highest_score': 'Eng yuqori',
         'lowest_score': 'Eng past',
         'top_scorer': 'Eng yaxshi',
-        'no_participants': 'Hali hech kim topshirmagan',
+        'no_participants': 'Hali hech kim yechmagan',
         'test_completed_notification': '🎉 <b>Yangi natija!</b>\n\n<b>{user_name}</b> sizning testingizni topshirdi.\n\n📊 <b>Natija:</b> {score}%',
         'your_test': 'Sizning testingiz',
         'share_test': '📤 Ulashish',

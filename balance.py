@@ -442,22 +442,39 @@ async def subscribe_callback(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode=ParseMode.HTML
     )
     
-    # Send notification to all admins
+    plan_months = plan_key.split('_')[0]
+    
     admin_notification = f"""
 🔔 <b>Yangi Premium so'rov!</b>
 
-👤 <b>Foydalanuvchi:</b> {username} (ID: {user_id})
+👤 <b>Foydalanuvchi:</b> {username} (ID: <code>{user_id}</code>)
 💰 <b>Summa:</b> {amount:,} UZS
 📅 <b>Tarif:</b> {period}
 
 Foydalanuvchi to'lov chekini yuboradi.
 """
     
+    # Add approve/decline buttons
+    admin_keyboard = [
+        [
+            InlineKeyboardButton(
+                "✅ Tasdiqlash",
+                callback_data=f"approve_premium_{user_id}_{plan_months}"
+            ),
+            InlineKeyboardButton(
+                "❌ Rad etish",
+                callback_data=f"decline_premium_{user_id}_{plan_months}"
+            )
+        ]
+    ]
+    admin_reply_markup = InlineKeyboardMarkup(admin_keyboard)
+    
     for admin_id in NOTIFICATION_ADMIN_IDS:
         try:
             await context.bot.send_message(
                 chat_id=int(admin_id),
                 text=admin_notification,
+                reply_markup=admin_reply_markup,
                 parse_mode=ParseMode.HTML
             )
         except Exception as e:
@@ -485,3 +502,119 @@ async def activate_premium(user_id: int, months: int):
     except Exception as e:
         logger.error(f"Error activating premium: {e}")
         return False
+
+
+async def approve_premium_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin handler to approve premium payment"""
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        # Extract user_id and plan from callback data
+        # Format: approve_premium_USER_ID_PLAN
+        data_parts = query.data.split('_')
+        user_id = int(data_parts[2])
+        plan_key = data_parts[3]  # e.g., "1", "3", "6", "12" (months)
+        
+        # Map plan to months
+        months_map = {
+            "1": 1,
+            "3": 3,
+            "6": 6,
+            "12": 12
+        }
+        months = months_map.get(plan_key)
+        
+        if not months:
+            await query.answer("❌ Invalid plan", show_alert=True)
+            return
+        
+        # Activate premium
+        from balance import activate_premium
+        success = await activate_premium(user_id, months)
+        
+        if success:
+            # Get user language
+            user_lang = get_user_language(user_id)
+            
+            # Calculate expiry date for display
+            from dateutil.relativedelta import relativedelta
+            expiry_date = datetime.now(timezone.utc) + relativedelta(months=months)
+            expiry_str = expiry_date.strftime('%d.%m.%Y')
+            
+            period_name = get_period_name(f"{plan_key}_month" if plan_key == "1" else f"{plan_key}_months", user_lang)
+            
+            # Update admin message
+            updated_admin_msg = query.message.text + f"\n\n✅ <b>TASDIQLANDI</b> — {query.from_user.first_name} tomonidan"
+            
+            try:
+                await query.edit_message_text(
+                    updated_admin_msg,
+                    parse_mode=ParseMode.HTML
+                )
+            except:
+                pass
+            
+            # Notify user
+            user_notification = PREMIUM_TRANSLATIONS[user_lang]["payment_approved"].format(
+                period=period_name,
+                expiry_date=expiry_str
+            )
+            
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=user_notification,
+                parse_mode=ParseMode.HTML
+            )
+            
+            await query.answer("✅ Premium activated!", show_alert=True)
+            logger.info(f"Premium approved for user {user_id}, plan: {months} months")
+        else:
+            await query.answer("❌ Error activating premium", show_alert=True)
+            
+    except Exception as e:
+        logger.error(f"Error approving premium: {e}")
+        await query.answer("❌ Error processing approval", show_alert=True)
+
+async def decline_premium_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Admin handler to decline premium payment"""
+    query = update.callback_query
+    await query.answer()
+    
+    try:
+        # Extract user_id from callback data
+        # Format: decline_premium_USER_ID_PLAN
+        data_parts = query.data.split('_')
+        user_id = int(data_parts[2])
+        
+        # Get user language
+        user_lang = get_user_language(user_id)
+        
+        # Update admin message
+        updated_admin_msg = query.message.text + f"\n\n❌ <b>RAD ETILDI</b> — {query.from_user.first_name} tomonidan"
+        
+        try:
+            await query.edit_message_text(
+                updated_admin_msg,
+                parse_mode=ParseMode.HTML
+            )
+        except:
+            pass
+        
+        # Notify user
+        user_notification = PREMIUM_TRANSLATIONS[user_lang]["payment_rejected"].format(
+            admin_username=ADMIN_USERNAME
+        )
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=user_notification,
+            parse_mode=ParseMode.HTML
+        )
+        
+        await query.answer("❌ Payment declined", show_alert=True)
+        logger.info(f"Premium declined for user {user_id}")
+        
+    except Exception as e:
+        logger.error(f"Error declining premium: {e}")
+        await query.answer("❌ Error processing decline", show_alert=True)
