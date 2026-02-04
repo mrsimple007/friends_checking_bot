@@ -214,6 +214,7 @@ def is_user_premium(user_id: int) -> bool:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
     user = update.effective_user
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     
     # Clear any ongoing conversation data
     context.user_data.clear()
@@ -921,7 +922,9 @@ async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     """Start taking a friend's test"""
     user_id = update.effective_user.id
     user = update.effective_user
-    
+
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+
     # Check if user exists in database
     try:
         user_result = supabase.table('friends_users').select('*').eq('telegram_id', str(user_id)).execute()
@@ -1362,19 +1365,35 @@ async def calculate_test_score(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show user's tests with share and create buttons"""
-    query = update.callback_query
-    await query.answer()
-    
-    user_id = update.effective_user.id
-    lang = get_user_language(user_id)
+    # Handle both callback query and regular message
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        user_id = update.effective_user.id
+        lang = get_user_language(user_id)
+    else:
+        # Called from command
+        user_id = update.effective_user.id
+        lang = get_user_language(user_id)
+        query = None
     
     try:
         # Get user's tests (limit to 1)
         tests_result = supabase.table('tests').select('*').eq('user_id', str(user_id)).order('created_at', desc=True).limit(1).execute()
         
         if not tests_result.data:
-            # ... existing code for no tests ...
-            pass
+            keyboard = [
+                [InlineKeyboardButton(get_text(lang, 'create_test'), callback_data='create_test')],
+                [InlineKeyboardButton(get_text(lang, 'back'), callback_data='back_to_menu')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            no_tests_text = get_text(lang, 'no_tests')
+            
+            if query:
+                await query.edit_message_text(no_tests_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+            else:
+                await update.message.reply_text(no_tests_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+            return
         
         test = tests_result.data[0]
         bot_username = context.bot.username
@@ -1391,7 +1410,7 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         text = get_text(lang, 'test_list') + "\n\n"
         
-        # FIXED: Get results ordered by score descending, then created_at ascending
+        # Get results ordered by score descending, then created_at ascending
         results = supabase.table('test_results').select('score, user_id, created_at').eq('test_id', test['id']).order('score', desc=True).order('created_at', desc=False).execute()
 
         # Format test date
@@ -1414,7 +1433,6 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text += f"📉 <b>{get_text(lang, 'lowest_score')}:</b> {min_score}%\n\n"
 
             text += f"<b>👤 {get_text(lang, 'participants')}:</b>\n"
-            # FIXED: Add ranking number
             for rank, r in enumerate(results.data, start=1):
                 try:
                     user_row = supabase.table('friends_users').select('first_name, last_name, username, telegram_id').eq('telegram_id', r['user_id']).execute()
@@ -1422,12 +1440,10 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception:
                     display_name = f"User {r['user_id']}"
                 text += f"  {rank}. <b>{display_name}</b> — {r['score']}%\n"
-
         else:
             text += f"<i>{get_text(lang, 'no_participants')}</i>\n"
         
-        
-        # Add share button directly
+        # Add share button
         keyboard = [
             [InlineKeyboardButton(
                 get_text(lang, 'share_test'),
@@ -1440,13 +1456,22 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        if query:
+            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+        else:
+            await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
         
     except Exception as e:
         logger.error(f"Error fetching tests: {e}")
         import traceback
         logger.error(traceback.format_exc())
-        await query.edit_message_text(get_text(lang, 'error'), parse_mode=ParseMode.HTML)
+        error_text = get_text(lang, 'error')
+        
+        if query:
+            await query.edit_message_text(error_text, parse_mode=ParseMode.HTML)
+        else:
+            await update.message.reply_text(error_text, parse_mode=ParseMode.HTML)
+
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show settings menu"""
@@ -1552,22 +1577,69 @@ async def my_test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /my_test command"""
     await my_tests(update, context)
 
-async def results_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /results command - shows test results"""
-    await my_tests(update, context)
-
 async def premium_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /premium command"""
     user_id = update.effective_user.id
     lang = get_user_language(user_id)
     
-    text = get_text(lang, 'premium_info')
+    # Check if user is already premium
+    try:
+        result = supabase.table('friends_users').select('is_premium, premium_until').eq('telegram_id', str(user_id)).execute()
+        if result.data and result.data[0].get('is_premium'):
+            from balance import PREMIUM_TRANSLATIONS
+            premium_until = result.data[0].get('premium_until')
+            if premium_until:
+                expiry_date = datetime.fromisoformat(premium_until.replace('Z', '+00:00')).strftime('%d.%m.%Y')
+                text = PREMIUM_TRANSLATIONS[lang]["already_premium"].format(
+                    expiry_date=expiry_date,
+                    admin_username=ADMIN_USERNAME
+                )
+                keyboard = [[InlineKeyboardButton(
+                    PREMIUM_TRANSLATIONS[lang]["back"],
+                    callback_data="back_to_menu"
+                )]]
+                await update.message.reply_text(
+                    text,
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                    parse_mode=ParseMode.HTML
+                )
+                return
+    except Exception as e:
+        logger.error(f"Error checking premium status: {e}")
     
-    keyboard = [[InlineKeyboardButton(get_text(lang, 'back'), callback_data='back_to_menu')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    # Show premium plans
+    from balance import PREMIUM_TRANSLATIONS
+    text = PREMIUM_TRANSLATIONS[lang]["premium_title"] + "\n\n"
+    text += PREMIUM_TRANSLATIONS[lang]["premium_description"]
     
-    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
-
+    keyboard = [
+        [InlineKeyboardButton(
+            PREMIUM_TRANSLATIONS[lang]["month_1"],
+            callback_data="subscribe_1_month"
+        )],
+        [InlineKeyboardButton(
+            PREMIUM_TRANSLATIONS[lang]["months_3"],
+            callback_data="subscribe_3_months"
+        )],
+        [InlineKeyboardButton(
+            PREMIUM_TRANSLATIONS[lang]["months_6"],
+            callback_data="subscribe_6_months"
+        )],
+        [InlineKeyboardButton(
+            PREMIUM_TRANSLATIONS[lang]["year_1"],
+            callback_data="subscribe_1_year"
+        )],
+        [InlineKeyboardButton(
+            PREMIUM_TRANSLATIONS[lang]["back"],
+            callback_data="back_to_menu"
+        )]
+    ]
+    
+    await update.message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode=ParseMode.HTML
+    )
 
 
 
@@ -1579,7 +1651,6 @@ def main():
     # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("my_test", my_test_command))
-    application.add_handler(CommandHandler("results", results_command))
     application.add_handler(CommandHandler("premium", premium_command))
 
 
