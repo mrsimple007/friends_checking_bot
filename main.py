@@ -213,6 +213,7 @@ def is_user_premium(user_id: int) -> bool:
 # Bot Handlers
 @log_user_action("BOT_START")
 
+@log_user_action("BOT_START")
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
     user = update.effective_user
@@ -220,17 +221,35 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Clear any ongoing conversation data
     context.user_data.clear()
     
+    # Auto-save user with default language 'uz' on first start
+    try:
+        result = supabase.table('friends_users').select('*').eq('telegram_id', str(user.id)).execute()
+        
+        if not result.data:
+            # New user - save immediately with default language
+            save_user(
+                telegram_id=user.id,
+                username=user.username or '',
+                language='uz',  # Default language
+                is_premium=False,
+                first_name=user.first_name or '',
+                last_name=user.last_name or ''
+            )
+            logger.info(f"NEW_USER_AUTO_SAVED: User {user.id} auto-saved with default language 'uz'")
+    except Exception as e:
+        logger.error(f"Error auto-saving user: {e}")
+        # Continue anyway - will try to save again on language selection
+    
     # Check if this is a test link
     if context.args and context.args[0].startswith('s_'):
         test_id = context.args[0][2:]
-        logger.info(f"USER_ACTION: User {user.id} (@{user.username}) started taking test {test_id}")
+        logger.info(f"USER_ACTION: User {user.id} ({user.first_name} + {user.last_name}) started taking test {test_id}")
         await start_taking_test(update, context, test_id)
         return
     else:
-        logger.info(f"USER_ACTION: User {user.id} (@{user.username}) started bot (regular start)")
+        logger.info(f"USER_ACTION: User {user.id} ({user.first_name} + {user.last_name}) started bot (regular start)")
    
-    
-    # Check if user exists
+    # Get user's current language (will be 'uz' for new users)
     try:
         result = supabase.table('friends_users').select('*').eq('telegram_id', str(user.id)).execute()
         
@@ -265,9 +284,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text=admin_message,
                     parse_mode=ParseMode.HTML
                 )
-            await show_main_menu(update, context, lang)
+            
+            # Always show language selection first, then main menu
+            await show_language_selection(update, context)
         else:
-            # New user, show language selection
+            # Shouldn't happen now, but fallback
             await show_language_selection(update, context)
     except Exception as e:
         logger.error(f"Error in start: {e}")
@@ -318,8 +339,14 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logger.info(f"LANGUAGE_SELECTED: User {user.id} (@{user.username}) selected language: {lang}")
 
-    # Save user with selected language
-    save_user(user.id, user.username or '', lang, first_name=user.first_name or '', last_name=user.last_name or '')
+    # Update user language (user already exists from start())
+    try:
+        supabase.table('friends_users').update({'language': lang}).eq('telegram_id', str(user.id)).execute()
+        logger.info(f"User {user.id} language updated to {lang}")
+    except Exception as e:
+        logger.error(f"Error updating user language: {e}")
+        # Fallback: save user again
+        save_user(user.id, user.username or '', lang, first_name=user.first_name or '', last_name=user.last_name or '')
     
     # Check if there's a pending test
     if 'pending_test_id' in context.user_data:
@@ -781,7 +808,7 @@ async def test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle test answer"""
     query = update.callback_query
     await query.answer()
-    
+    user_id = update.effective_user.id
     lang = get_user_language(update.effective_user.id)
     answer_index = int(query.data.split('_')[2])
     
@@ -789,10 +816,15 @@ async def test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question_index = context.user_data['current_question']
     context.user_data['test_answers'][question_index] = answer_index
     
-    logger.info(f"Question {question_index} answered with option {answer_index}. Total answers so far: {len(context.user_data['test_answers'])}")
+    logger.info(f"Creating test - Question {question_index} answered with option {answer_index} by user {user_id}. Total answers so far: {len(context.user_data['test_answers'])}")
     
     # Move to next question
     context.user_data['current_question'] += 1
+    
+    # Check if we've completed all 15 questions (0-14)
+    if len(context.user_data['test_answers']) >= 15:
+        await save_test(update, context, lang)
+        return ConversationHandler.END
     
     # Continue showing questions
     await show_test_question(update, context, lang)
@@ -1165,6 +1197,7 @@ async def taking_test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
     lang = get_user_language(update.effective_user.id)
     answer_index = int(query.data.split('_')[2])
     user_id = update.effective_user.id
+    
     # Save answer
     question_index = context.user_data['taking_test_question']
     context.user_data['taking_test_answers'][question_index] = answer_index
@@ -1173,6 +1206,11 @@ async def taking_test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # Move to next question
     context.user_data['taking_test_question'] += 1
+    
+    # Check if we've completed all 15 questions (0-14)
+    if len(context.user_data['taking_test_answers']) >= 15:
+        await calculate_test_score(update, context, lang)
+        return
     
     await show_taking_test_question(update, context, lang)
 
@@ -1492,6 +1530,8 @@ async def generate_wish_handler(update: Update, context: ContextTypes.DEFAULT_TY
             
             await query.edit_message_text(get_text(lang, 'generating_wish'), parse_mode=ParseMode.HTML)
             
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+            
             # Generate wish
             wish = generate_birthday_wish(name, lang)
             
@@ -1499,6 +1539,7 @@ async def generate_wish_handler(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e:
         logger.error(f"Error generating wish: {e}")
         await query.edit_message_text(get_text(lang, 'error'), parse_mode=ParseMode.HTML)
+
 
 def main():
     """Start the bot"""
