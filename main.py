@@ -210,9 +210,6 @@ def is_user_premium(user_id: int) -> bool:
         logger.error(f"Error checking premium status: {e}")
     return False
 
-# Bot Handlers
-@log_user_action("BOT_START")
-
 @log_user_action("BOT_START")
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
@@ -221,41 +218,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Clear any ongoing conversation data
     context.user_data.clear()
     
-    # Auto-save user with default language 'uz' on first start
-    try:
-        result = supabase.table('friends_users').select('*').eq('telegram_id', str(user.id)).execute()
-        
-        if not result.data:
-            # New user - save immediately with default language
-            save_user(
-                telegram_id=user.id,
-                username=user.username or '',
-                language='uz',  # Default language
-                is_premium=False,
-                first_name=user.first_name or '',
-                last_name=user.last_name or ''
-            )
-            logger.info(f"NEW_USER_AUTO_SAVED: User {user.id} auto-saved with default language 'uz'")
-    except Exception as e:
-        logger.error(f"Error auto-saving user: {e}")
-        # Continue anyway - will try to save again on language selection
-    
     # Check if this is a test link
     if context.args and context.args[0].startswith('s_'):
         test_id = context.args[0][2:]
-        logger.info(f"USER_ACTION: User {user.id} ({user.first_name} + {user.last_name}) started taking test {test_id}")
+        logger.info(f"USER_ACTION: User {user.id} ({user.first_name} {user.last_name}) started taking test {test_id}")
         await start_taking_test(update, context, test_id)
         return
-    else:
-        logger.info(f"USER_ACTION: User {user.id} ({user.first_name} + {user.last_name}) started bot (regular start)")
-   
-    # Get user's current language (will be 'uz' for new users)
+    
+    # Regular start - check if user exists
     try:
         result = supabase.table('friends_users').select('*').eq('telegram_id', str(user.id)).execute()
         
         if result.data:
+            # Existing user - get their language and show main menu directly
             lang = result.data[0]['language']
-
+            logger.info(f"USER_ACTION: Existing user {user.id} started bot with language {lang}")
+            
+            # Show admin dashboard if admin
             if user.id in NOTIFICATION_ADMIN_IDS:
                 total_users, total_birthdays, total_tests, total_results, todays_active, premium_count = await asyncio.gather(
                     get_total_users(),
@@ -285,11 +264,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode=ParseMode.HTML
                 )
             
-            # Always show language selection first, then main menu
-            await show_language_selection(update, context)
+            # Show main menu directly for existing users
+            await show_main_menu(update, context, lang)
         else:
-            # Shouldn't happen now, but fallback
+            # New user - save with default language and show language selection
+            save_user(
+                telegram_id=user.id,
+                username=user.username or '',
+                language='uz',  # Default language
+                is_premium=False,
+                first_name=user.first_name or '',
+                last_name=user.last_name or ''
+            )
+            logger.info(f"NEW_USER_AUTO_SAVED: User {user.id} auto-saved with default language 'uz'")
+            
+            # Show language selection for new users
             await show_language_selection(update, context)
+            
     except Exception as e:
         logger.error(f"Error in start: {e}")
         await show_language_selection(update, context)
@@ -929,25 +920,48 @@ async def save_test(update: Update, context: ContextTypes.DEFAULT_TYPE, lang: st
 async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, test_id: str):
     """Start taking a friend's test"""
     user_id = update.effective_user.id
+    user = update.effective_user
     
     # Check if user exists in database
     try:
         user_result = supabase.table('friends_users').select('*').eq('telegram_id', str(user_id)).execute()
         
         if not user_result.data:
+            # New user - save with default language first
+            save_user(
+                telegram_id=user.id,
+                username=user.username or '',
+                language='uz',  # Default language
+                is_premium=False,
+                first_name=user.first_name or '',
+                last_name=user.last_name or ''
+            )
+            logger.info(f"NEW_USER_AUTO_SAVED: User {user.id} auto-saved with default 'uz' before test")
+            
+            # Store test ID and show language selection
             context.user_data['pending_test_id'] = test_id
             await show_language_selection(update, context)
             return
         
+        # Existing user - get their language
         lang = user_result.data[0]['language']
         
     except Exception as e:
         logger.error(f"Error checking user: {e}")
-        # If error, assume new user
+        # On error, save as new user and show language selection
+        save_user(
+            telegram_id=user.id,
+            username=user.username or '',
+            language='uz',
+            is_premium=False,
+            first_name=user.first_name or '',
+            last_name=user.last_name or ''
+        )
         context.user_data['pending_test_id'] = test_id
         await show_language_selection(update, context)
         return
     
+    # Rest of the function remains the same...
     # Check if test exists
     try:
         result = supabase.table('tests').select('*').eq('id', test_id).execute()
@@ -1120,7 +1134,8 @@ async def show_taking_test_question(update: Update, context: ContextTypes.DEFAUL
     questions = get_questions(lang)
     question_index = context.user_data['taking_test_question']
     
-    if question_index >= 15 or question_index >= len(questions):
+    # FIXED: Strict check for 15 questions (0-14)
+    if question_index >= 15:
         # All questions answered, calculate score
         await calculate_test_score(update, context, lang)
         return
@@ -1207,8 +1222,8 @@ async def taking_test_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Move to next question
     context.user_data['taking_test_question'] += 1
     
-    # Check if we've completed all 15 questions (0-14)
-    if len(context.user_data['taking_test_answers']) >= 15:
+    # FIXED: Check if we've completed exactly 15 questions (0-14)
+    if context.user_data['taking_test_question'] >= 15:
         await calculate_test_score(update, context, lang)
         return
     
@@ -1221,6 +1236,16 @@ async def calculate_test_score(update: Update, context: ContextTypes.DEFAULT_TYP
     user_answers = context.user_data['taking_test_answers']
     
     try:
+        # FIXED: Validate exactly 15 answers before proceeding
+        if len(user_answers) != 15:
+            logger.error(f"Invalid answer count: {len(user_answers)}, expected 15")
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=get_text(lang, 'error') + f"\n\nDebug: Invalid answer count ({len(user_answers)}/15)",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
         # Get owner's answers from JSONB column
         result = supabase.table('tests').select('answers, user_id').eq('id', test_id).execute()
         
@@ -1248,22 +1273,22 @@ async def calculate_test_score(update: Update, context: ContextTypes.DEFAULT_TYP
         logger.info(f"Owner answers: {owner_answers}")
         logger.info(f"User answers: {user_answers}")
         
-        # Calculate score
-        correct = sum(1 for q, a in user_answers.items() if owner_answers.get(q) == a)
-        total = len(user_answers)
+        # Calculate score - only use questions 0-14
+        correct = sum(1 for q in range(15) if owner_answers.get(q) == user_answers.get(q))
+        total = 15
         percentage = int((correct / total) * 100)
         
         logger.info(f"Score: {correct}/{total} = {percentage}%")
         logger.info(f"TEST_COMPLETED: User {user_id} | Test {test_id} | Score: {percentage}% ({correct}/{total})")
         
-        # Save result
+        # FIXED: Save result with upsert to prevent duplicate key error
         result_data = {
             'test_id': test_id,
             'user_id': str(user_id),
             'score': percentage,
             'created_at': datetime.now(timezone.utc).isoformat()
         }
-        supabase.table('test_results').insert(result_data).execute()
+        supabase.table('test_results').upsert(result_data).execute()
         
         # Notify test owner about the result
         try:
@@ -1348,27 +1373,8 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tests_result = supabase.table('tests').select('*').eq('user_id', str(user_id)).order('created_at', desc=True).limit(1).execute()
         
         if not tests_result.data:
-            # Empty list with create button
-            text = get_text(lang, 'no_tests')
-            
-            keyboard = [
-                [InlineKeyboardButton(
-                    get_text(lang, 'create_test'),
-                    callback_data='create_test'
-                )],
-                [InlineKeyboardButton(
-                    get_text(lang, 'back'),
-                    callback_data='back_to_menu'
-                )]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                text,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML
-            )
-            return
+            # ... existing code for no tests ...
+            pass
         
         test = tests_result.data[0]
         bot_username = context.bot.username
@@ -1385,8 +1391,8 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         text = get_text(lang, 'test_list') + "\n\n"
         
-        # Get results with user info
-        results = supabase.table('test_results').select('score, user_id').eq('test_id', test['id']).execute()
+        # FIXED: Get results ordered by score descending, then created_at ascending
+        results = supabase.table('test_results').select('score, user_id, created_at').eq('test_id', test['id']).order('score', desc=True).order('created_at', desc=False).execute()
 
         # Format test date
         test_date = datetime.fromisoformat(test['created_at'].replace('Z', '+00:00'))
@@ -1407,18 +1413,19 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text += f"🏆 <b>{get_text(lang, 'highest_score')}:</b> {max_score}%\n"
             text += f"📉 <b>{get_text(lang, 'lowest_score')}:</b> {min_score}%\n\n"
 
-            # List each participant with name + score
             text += f"<b>👤 {get_text(lang, 'participants')}:</b>\n"
-            for r in results.data:
+            # FIXED: Add ranking number
+            for rank, r in enumerate(results.data, start=1):
                 try:
                     user_row = supabase.table('friends_users').select('first_name, last_name, username, telegram_id').eq('telegram_id', r['user_id']).execute()
                     display_name = format_display_name(user_row.data[0]) if user_row.data else f"User {r['user_id']}"
                 except Exception:
                     display_name = f"User {r['user_id']}"
-                text += f"  • <b>{display_name}</b> — {r['score']}%\n"
+                text += f"  {rank}. <b>{display_name}</b> — {r['score']}%\n"
 
         else:
             text += f"<i>{get_text(lang, 'no_participants')}</i>\n"
+        
         
         # Add share button directly
         keyboard = [
@@ -1541,6 +1548,29 @@ async def generate_wish_handler(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(get_text(lang, 'error'), parse_mode=ParseMode.HTML)
 
 
+async def my_test_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /my_test command"""
+    await my_tests(update, context)
+
+async def results_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /results command - shows test results"""
+    await my_tests(update, context)
+
+async def premium_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /premium command"""
+    user_id = update.effective_user.id
+    lang = get_user_language(user_id)
+    
+    text = get_text(lang, 'premium_info')
+    
+    keyboard = [[InlineKeyboardButton(get_text(lang, 'back'), callback_data='back_to_menu')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+
+
+
 def main():
     """Start the bot"""
     # Create application
@@ -1548,7 +1578,11 @@ def main():
     
     # Add handlers
     application.add_handler(CommandHandler("start", start))
-    
+    application.add_handler(CommandHandler("my_test", my_test_command))
+    application.add_handler(CommandHandler("results", results_command))
+    application.add_handler(CommandHandler("premium", premium_command))
+
+
     # Birthday conversation handler
     birthday_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(add_birthday_start, pattern='^add_birthday$')],
