@@ -1,19 +1,12 @@
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Virtual environment
-venv/
-env/
-ENV/
-.venv/
-
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# C extensions
 *.so
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -26,57 +19,70 @@ lib64/
 parts/
 sdist/
 var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+.ENV/
 
-# OS
+# VS Code settings
+.vscode/
+
+# PyCharm settings
+.idea/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# macOS
 .DS_Store
+
+# Windows
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Test output
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
 
 # Logs
 *.log
-logs/
 
-# Database
-*.db
-*.sqlite
+# dotenv environment variables
+.env
+.env.*
+
+# Telegram bot tokens, API keys, secrets
+*.secret
+*.key
+
+# Supabase or other local config
+supabase/.env
+supabase/.env.local
+
+# Node modules (if any frontend)
+node_modules/
+
+# Other
 *.sqlite3
+*.db
 
-# Backup files
-*.bak
-*.backup
 
-# Temporary files
-tmp/
-temp/
-*.tmp
 
-# Coverage reports
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
-
-# pytest
-.pytest_cache/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+SIMPLEQUIZ_MESSAGE.py # This file is used to store messages for the SimpleQuiz Telegram bot.
