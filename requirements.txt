@@ -1,4 +1,6 @@
 # Telegram Bot Dependencies
+python-telegram-bot[job-queue]
+# Telegram Bot Dependencies
 python-telegram-bot>=20.0
 supabase>=1.0.0
 google-generativeai
