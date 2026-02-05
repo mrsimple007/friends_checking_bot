@@ -29,6 +29,8 @@ load_dotenv()
 
 # Environment variables
 TELEGRAM_BOT_TOKEN = os.environ.get("BOT_TOKEN")
+# TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN_SIMPLELEARNINGUZ")
+
 SUPABASE_URL = os.environ.get("ACTIVITY_SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("ACTIVITY_SUPABASE_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
@@ -65,10 +67,6 @@ ADMIN_IDS = [8437026582, 122290051, 999932510]
 # Free tier limits
 FREE_BIRTHDAY_LIMIT = 50
 FREE_TEST_LIMIT = 3
-
-# Premium pricing
-PREMIUM_PRICE_MONTHLY = 4.99
-PREMIUM_PRICE_YEARLY = 49.99
 
 # Birthday reminder settings
 REMINDER_TIME_UTC = "09:00"  # Send reminders at 9 AM UTC
@@ -122,17 +120,9 @@ TIMEZONE_DETECTION_ENABLED = False  # Auto-detect user timezone (future)
 WISH_LENGTH_MIN = 50  # Minimum characters in generated wish
 WISH_LENGTH_MAX = 200  # Maximum characters in generated wish
 
-# Test sharing settings
-TEST_LINK_EXPIRY_DAYS = 365  # Links expire after 1 year
-TEST_MAX_ATTEMPTS_PER_USER = 1  # Users can only take each test once
-
 # Notification settings
 NOTIFY_ON_TEST_COMPLETION = True
 NOTIFY_TEST_CREATOR = True
-
-# Data retention
-DELETE_INACTIVE_TESTS_AFTER_DAYS = 180
-DELETE_OLD_ANALYTICS_AFTER_DAYS = 90
 
 
 import traceback
