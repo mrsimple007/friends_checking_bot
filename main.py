@@ -897,7 +897,11 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
             no_tests_text = get_text(lang, 'no_tests')
             
             if query:
-                await query.edit_message_text(no_tests_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+                try:
+                    await query.edit_message_text(no_tests_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+                except Exception as e:
+                    if "message is not modified" not in str(e).lower():
+                        raise
             else:
                 await update.message.reply_text(no_tests_text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
             return
@@ -925,9 +929,10 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
         date_str = test_date.strftime('%d.%m.%Y')
 
         # Build test info
+        total_participants = len(results.data)
         text += f"📝 <b>{get_text(lang, 'your_test')}</b> ({date_str})\n"
         text += f"🔗 <b>{get_text(lang, 'link')}:</b> <code>{share_link}</code>\n"
-        text += f"👥 <b>{get_text(lang, 'participants')}:</b> {len(results.data)}\n\n"
+        text += f"👥 <b>{get_text(lang, 'participants')}:</b> {total_participants}\n\n"
 
         if results.data:
             scores = [r['score'] for r in results.data]
@@ -939,14 +944,25 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text += f"🏆 <b>{get_text(lang, 'highest_score')}:</b> {max_score}%\n"
             text += f"📉 <b>{get_text(lang, 'lowest_score')}:</b> {min_score}%\n\n"
 
-            text += f"<b>👤 {get_text(lang, 'participants')}:</b>\n"
-            for rank, r in enumerate(results.data, start=1):
+            # Limit to top 30 participants
+            display_limit = 30
+            displayed_results = results.data[:display_limit]
+            
+            text += f"<b>👤 {get_text(lang, 'participants')}"
+            if total_participants > display_limit:
+                text += f" (Top {display_limit})"
+            text += ":</b>\n"
+            
+            for rank, r in enumerate(displayed_results, start=1):
                 try:
                     user_row = supabase.table('friends_users').select('first_name, last_name, username, telegram_id').eq('telegram_id', r['user_id']).execute()
                     display_name = format_display_name(user_row.data[0]) if user_row.data else f"User {r['user_id']}"
                 except Exception:
                     display_name = f"User {r['user_id']}"
                 text += f"  {rank}. <b>{display_name}</b> — {r['score']}%\n"
+            
+            if total_participants > display_limit:
+                text += f"\n<i>... and {total_participants - display_limit} more</i>\n"
         else:
             text += f"<i>{get_text(lang, 'no_participants')}</i>\n"
         
@@ -964,21 +980,31 @@ async def my_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         if query:
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+            try:
+                await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+            except Exception as e:
+                # Ignore "message is not modified" error
+                if "message is not modified" not in str(e).lower():
+                    raise
         else:
             await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
         
     except Exception as e:
-        logger.error(f"Error fetching tests: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+        # Don't log "message is not modified" errors
+        if "message is not modified" not in str(e).lower():
+            logger.error(f"Error fetching tests: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+        
         error_text = get_text(lang, 'error')
         
         if query:
-            await query.edit_message_text(error_text, parse_mode=ParseMode.HTML)
+            try:
+                await query.edit_message_text(error_text, parse_mode=ParseMode.HTML)
+            except Exception:
+                pass  # Silently ignore if we can't edit
         else:
             await update.message.reply_text(error_text, parse_mode=ParseMode.HTML)
-
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show settings menu"""
