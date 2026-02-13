@@ -1,3 +1,119 @@
+import random
+
+def get_friendship_level_message(score: int, lang: str) -> tuple:
+    """
+    Get friendship level emoji, title, and a random encouraging message
+    Returns: (emoji, level_title, message)
+    """
+    
+    if score >= 80:
+        # Best Friend Level (80-100%)
+        messages = {
+            'uz': [
+                "🌟 Siz bir-biringizni juda yaxshi bilasiz! Bunday do'stlik kamdan-kam uchraydi. Davom eting va bir-biringizni qo'llab-quvvatlashda davom eting! 💝",
+                "🌟 Ajoyib! Siz haqiqiy do'stsiz! Bir-biringiz haqida bu darajada bilim - bu noyob va qimmatli narsa. Sizning do'stligingiz ilhom beradi! ✨",
+                "🌟 Mukammal natija! Siz bir-biringizning eng sirli tomonlarini ham bilasiz. Bunday do'stlik - hayotning eng katta ne'matilaridan biri! 🎯"
+            ],
+            'ru': [
+                "🌟 Вы очень хорошо знаете друг друга! Такая дружба встречается редко. Продолжайте поддерживать друг друга! 💝",
+                "🌟 Потрясающе! Вы настоящие друзья! Знать друг о друге так много - это редкость и ценность. Ваша дружба вдохновляет! ✨",
+                "🌟 Идеальный результат! Вы знаете даже самые тайные стороны друг друга. Такая дружба - одно из величайших благ в жизни! 🎯"
+            ],
+            'en': [
+                "🌟 You know each other incredibly well! Such friendship is rare. Keep supporting each other! 💝",
+                "🌟 Amazing! You're true friends! Knowing this much about each other is rare and precious. Your friendship is inspiring! ✨",
+                "🌟 Perfect result! You even know each other's deepest secrets. Such friendship is one of life's greatest blessings! 🎯"
+            ]
+        }
+        level_titles = {
+            'uz': '💎 Eng yaqin do\'st',
+            'ru': '💎 Лучший друг',
+            'en': '💎 Best Friend'
+        }
+        
+    elif score >= 60:
+        # Close Friend Level (60-79%)
+        messages = {
+            'uz': [
+                "💫 Siz yaxshi do'stsiz! Bir-biringiz haqida ko'p narsani bilasiz. Birga ko'proq vaqt o'tkazing va yanada yaqinroq bo'ling! 🤗",
+                "💫 Ajoyib natija! Sizning do'stligingiz mustahkam. Yana bir necha suhbat va siz bir-biringizni mukammal bilib olasiz! 🌈",
+                "💫 Zo'r! Siz bir-biringizni yaxshi tushunasiz. Davom eting, sizning do'stligingiz o'sishda davom etmoqda! 🚀"
+            ],
+            'ru': [
+                "💫 Вы хорошие друзья! Вы много знаете друг о друге. Проводите больше времени вместе и станьте ещё ближе! 🤗",
+                "💫 Отличный результат! Ваша дружба крепкая. Ещё несколько бесед, и вы будете знать друг друга идеально! 🌈",
+                "💫 Здорово! Вы хорошо понимаете друг друга. Продолжайте, ваша дружба продолжает расти! 🚀"
+            ],
+            'en': [
+                "💫 You're good friends! You know a lot about each other. Spend more time together and become even closer! 🤗",
+                "💫 Great result! Your friendship is strong. A few more conversations and you'll know each other perfectly! 🌈",
+                "💫 Awesome! You understand each other well. Keep going, your friendship keeps growing! 🚀"
+            ]
+        }
+        level_titles = {
+            'uz': '💫 Yaqin do\'st',
+            'ru': '💫 Близкий друг',
+            'en': '💫 Close Friend'
+        }
+        
+    elif score >= 40:
+        # Friend Level (40-59%)
+        messages = {
+            'uz': [
+                "🤝 Siz do'stsiz va bu ajoyib! Bir-biringiz haqida ko'proq bilib olish uchun ko'proq suhbatlashing. Har bir suhbat sizni yaqinlashtiradi! 💬",
+                "🤝 Yaxshi boshlash! Sizda do'stlik uchun yaxshi asos bor. Ko'proq savol bering, hikoyalar almashing - va siz yanada yaqinroq bo'lasiz! 🌟",
+                "🤝 Zo'r yo'ldasiz! Bir-biringiz haqida yanada ko'proq bilib olish uchun birga vaqt o'tkazing. Do'stlik - bu sayohat! 🎈"
+            ],
+            'ru': [
+                "🤝 Вы друзья, и это прекрасно! Общайтесь больше, чтобы узнать друг друга лучше. Каждый разговор сближает вас! 💬",
+                "🤝 Хорошее начало! У вас есть хорошая база для дружбы. Задавайте больше вопросов, делитесь историями - и вы станете ещё ближе! 🌟",
+                "🤝 Вы на правильном пути! Проводите больше времени вместе, чтобы узнать друг о друге больше. Дружба - это путешествие! 🎈"
+            ],
+            'en': [
+                "🤝 You're friends, and that's wonderful! Talk more to learn about each other better. Every conversation brings you closer! 💬",
+                "🤝 Good start! You have a solid foundation for friendship. Ask more questions, share stories - and you'll become even closer! 🌟",
+                "🤝 You're on the right track! Spend more time together to learn more about each other. Friendship is a journey! 🎈"
+            ]
+        }
+        level_titles = {
+            'uz': '🤝 Do\'st',
+            'ru': '🤝 Друг',
+            'en': '🤝 Friend'
+        }
+        
+    else:
+        # Acquaintance Level (0-39%)
+        messages = {
+            'uz': [
+                "👋 Siz tanishsiz, lekin bu - do'stlikning boshlanishi! Bir-biringiz haqida ko'proq bilib olish uchun savollar bering. Har qanday ajoyib do'stlik tanishlikdan boshlanadi! 🌱",
+                "👋 Siz hozirgina tanishdingiz! Bu juda yaxshi boshlang'ich. Ko'proq suhbatlashing, umumiy qiziqishlarni toping - va tez orada siz yaxshi do'stlar bo'lasiz! ✨",
+                "👋 Tanishlik - bu do'stlik zinapoyasining birinchi pog'onasi! Birga vaqt o'tkazing, hikoyalar almashing, va siz bir-biringizni yaxshiroq bilib olasiz. Omad! 🍀"
+            ],
+            'ru': [
+                "👋 Вы знакомы, но это только начало дружбы! Задавайте вопросы, чтобы узнать друг о друге больше. Любая великая дружба начинается со знакомства! 🌱",
+                "👋 Вы только познакомились! Это отличное начало. Общайтесь больше, находите общие интересы - и скоро вы станете хорошими друзьями! ✨",
+                "👋 Знакомство - это первая ступень лестницы дружбы! Проводите время вместе, делитесь историями, и вы узнаете друг друга лучше. Удачи! 🍀"
+            ],
+            'en': [
+                "👋 You're acquaintances, but this is just the beginning of friendship! Ask questions to learn more about each other. Every great friendship starts with getting to know each other! 🌱",
+                "👋 You've just met! This is a great start. Talk more, find common interests - and soon you'll become good friends! ✨",
+                "👋 Acquaintance is the first step on the ladder of friendship! Spend time together, share stories, and you'll get to know each other better. Good luck! 🍀"
+            ]
+        }
+        level_titles = {
+            'uz': '👋 Tanish',
+            'ru': '👋 Знакомый',
+            'en': '👋 Acquaintance'
+        }
+    
+    # Get random message for the language
+    message = random.choice(messages.get(lang, messages['en']))
+    level_title = level_titles.get(lang, level_titles['en'])
+    
+    return level_title, message
+
+
+
 TRANSLATIONS = {
     'uz': {
         'welcome': (
@@ -97,7 +213,8 @@ TRANSLATIONS = {
         'your_test': 'Sizning testingiz',
         'share_test': '📤 Testni Ulashish',
 "recreate_test": '🔄 Testni qayta yaratish',
-
+'streaks': '🔥 Streaklar',
+        'leaderboard': '🏆 Liderlar jadvali',
 
 
 
@@ -208,6 +325,11 @@ TRANSLATIONS = {
         'your_test': 'Ваш тест',
         'share_test': '📤 Поделиться',
 "recreate_test": '🔄 Пересоздать тест',
+'streaks': '🔥 Стрики',
+        'leaderboard': '🏆 Таблица лидеров',
+
+
+
 
 
 
@@ -314,5 +436,28 @@ TRANSLATIONS = {
         'test_completed_notification': '🎉 <b>New result!</b>\n\n<b>{user_name}</b> completed your test.\n\n📊 <b>Result:</b> {score}%',
         'your_test': 'Your test',
         'share_test': '📤 Share',
+'streaks': '🔥 Streaks',
+        'leaderboard': '🏆 Leaderboard',
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     }
 }

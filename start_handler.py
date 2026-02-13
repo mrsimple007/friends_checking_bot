@@ -249,8 +249,13 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
             InlineKeyboardButton(get_text(lang, 'my_tests'), callback_data='my_tests')
         ],
         [
-            InlineKeyboardButton(get_text(lang, 'settings'), callback_data='settings'),
+            InlineKeyboardButton(get_text(lang, 'leaderboard'), callback_data='streak_leaderboard'),  # NEW
             InlineKeyboardButton(get_text(lang, 'premium'), callback_data='premium')
+        ],
+        [
+            InlineKeyboardButton(get_text(lang, 'streaks'), callback_data='streaks_menu'),  # NEW
+
+            InlineKeyboardButton(get_text(lang, 'settings'), callback_data='settings')
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -270,8 +275,6 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, lan
 
 
 
-
-
 @log_user_action("BOT_START")
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
@@ -280,6 +283,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Clear any ongoing conversation data
     context.user_data.clear()
+    
+    # NEW: Check if this is a streak link
+    if context.args and context.args[0].startswith('streak_'):
+        await handle_streak_link(update, context)
+        return
     
     # Check if this is a test link
     if context.args and context.args[0].startswith('s_'):
@@ -354,6 +362,87 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error in start: {e}")
         await show_language_selection(update, context)
+
+
+async def handle_streak_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle streak link clicks"""
+    from friendship_streaks import get_or_create_streak, update_streak, get_streak_text
+    from streak_actions import log_interaction
+    
+    user = update.effective_user
+    user_id = user.id
+    
+    # Parse streak link: streak_{sender_id} or streak_{sender_id}_{friend_id}
+    try:
+        parts = context.args[0].split('_')
+        sender_id = int(parts[1])
+        
+        # Check if user is clicking their own link
+        if user_id == sender_id:
+            await update.message.reply_text(
+                "❌ You cannot start a streak with yourself.",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        # Get user language
+        lang = get_user_language(user_id)
+        
+        # Get or create streak (friend_id is the clicker)
+        streak = get_or_create_streak(sender_id, user_id)
+        if not streak:
+            await update.message.reply_text("❌ Error creating streak")
+            return
+        
+        # Update streak
+        streak_days = update_streak(streak['id'], sender_id, user_id)
+        
+        # Log interaction
+        log_interaction(streak['id'], sender_id, user_id, 'streak_link_clicked')
+        
+        # Get sender name
+        sender_info = supabase.table('friends_users')\
+            .select('first_name, last_name, language')\
+            .eq('telegram_id', str(sender_id))\
+            .execute()
+        
+        sender_name = 'Friend'
+        sender_lang = 'en'
+        if sender_info.data:
+            sender_name = f"{sender_info.data[0].get('first_name', '')} {sender_info.data[0].get('last_name', '')}".strip()
+            sender_lang = sender_info.data[0].get('language', 'en')
+        
+        # Notify friend (the clicker)
+        friend_messages = {
+            'uz': f"✅ <b>Streak boshlandi!</b>\n\n🔥 {sender_name} bilan streak: <b>{streak_days} kun</b>\n\n💡 <i>Har kunlik muloqot orqali streakni davom ettiring!</i>",
+            'ru': f"✅ <b>Полоса начата!</b>\n\n🔥 Полоса с {sender_name}: <b>{streak_days} дней</b>\n\n💡 <i>Продолжайте общаться каждый день, чтобы сохранить полосу!</i>",
+            'en': f"✅ <b>Streak started!</b>\n\n🔥 Streak with {sender_name}: <b>{streak_days} days</b>\n\n💡 <i>Keep interacting daily to maintain the streak!</i>"
+        }
+        
+        await update.message.reply_text(
+            friend_messages.get(lang, friend_messages['en']),
+            parse_mode=ParseMode.HTML
+        )
+        
+        # Notify sender
+        sender_messages = {
+            'uz': f"✅ <b>Do'stingiz havolani bosdi!</b>\n\n🔥 {user.first_name} bilan streak boshlandi: <b>{streak_days} kun</b>",
+            'ru': f"✅ <b>Друг нажал на ссылку!</b>\n\n🔥 Полоса с {user.first_name} начата: <b>{streak_days} дней</b>",
+            'en': f"✅ <b>Your friend clicked the link!</b>\n\n🔥 Streak with {user.first_name} started: <b>{streak_days} days</b>"
+        }
+        
+        await context.bot.send_message(
+            chat_id=sender_id,
+            text=sender_messages.get(sender_lang, sender_messages['en']),
+            parse_mode=ParseMode.HTML
+        )
+        
+        logger.info(f"STREAK_LINK_CLICKED: User {user_id} clicked streak link from {sender_id} | Streak: {streak_days} days")
+        
+    except Exception as e:
+        logger.error(f"Error handling streak link: {e}")
+        await update.message.reply_text("❌ Error processing streak link")
+
 
 async def start_taking_test(update: Update, context: ContextTypes.DEFAULT_TYPE, test_id: str):
     from main import show_taking_test_question

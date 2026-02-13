@@ -51,13 +51,13 @@ def generate_message(name, language):
     if language == "en":
         return (
             f"Hey {escaped_name}\\! 👋\n\n"
-            "🏆 *Our record in solving friendship tests is 86%\\!*\n\n"
+            "🏆 *Our record in solving friendship tests is 80%\\!*\n\n"
             "🤔 Do we have someone who can break this record?\n\n"
             "💪 *Challenge your best friend NOW:*\n"
             "• Create your unique friendship test\n"
             "• Send it to your closest friends\n"
             "• See who really knows you best\\!\n\n"
-            "🔥 Can someone's friendship break the 86% record?\n\n"
+            "🔥 Can someone's friendship break the 80% record?\n\n"
             "⚡️ Start the challenge:\n"
             "/start\n\n"
             "🎯 *Test your friendship \\- prove you're the best\\!*"
@@ -66,13 +66,13 @@ def generate_message(name, language):
     elif language == "ru":
         return (
             f"Привет, {escaped_name}\\! 👋\n\n"
-            "🏆 *Наш рекорд в тестах на дружбу \\— 86%\\!*\n\n"
+            "🏆 *Наш рекорд в тестах на дружбу \\— 80%\\!*\n\n"
             "🤔 Есть ли тот, кто сможет побить этот рекорд?\n\n"
             "💪 *Бросьте вызов своему лучшему другу СЕЙЧАС:*\n"
             "• Создайте свой уникальный тест на дружбу\n"
             "• Отправьте его самым близким друзьям\n"
             "• Узнайте, кто знает вас лучше всех\\!\n\n"
-            "🔥 Сможет ли чья\\-то дружба побить рекорд 86%?\n\n"
+            "🔥 Сможет ли чья\\-то дружба побить рекорд 80%?\n\n"
             "⚡️ Начните испытание:\n"
             "/start\n\n"
             "🎯 *Проверьте свою дружбу \\- докажите, что вы лучшие\\!*"
@@ -81,12 +81,12 @@ def generate_message(name, language):
     elif language == "uz":
         return (
             f"Salom, {escaped_name}\\! 👋\n\n"
-            "🏆 *Do'stlik testidagi rekordimiz 78%\\!*\n\n"
+            "🏆 *Do'stlik testidagi yangi rekordimiz 80%\\!*\n\n"
             "🤔 Bu rekordni buzadiganlar bormi?\n\n"
             "• O'zingizning do'stlik testingizni yarating\n"
             "• Eng yaqin do'stlaringizga yuboring\n"
-            "• Kim sizni eng yaxshi bilishini bilib oling\\!\n\n"
-            "🔥 Kimningdir do'stligi 78% rekordni buzadimi?\n\n"
+            "• Kim sizni yaxshiroq bilarkin, bilib oling\\!\n\n"
+            "🔥 Kimningdir do'stligi 80% rekordni buzadimi?\n\n"
             "⚡️ Tezda sinab ko'ring:\n"
             "/start\n\n"
             "🎯 *Do'stligingizni sinab ko'ring \\- eng yaxshi ekanligingizni isbotlang\\!*"

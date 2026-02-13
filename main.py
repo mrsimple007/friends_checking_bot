@@ -20,6 +20,9 @@ from balance import premium_info_handler, subscribe_callback, approve_premium_pa
 import urllib.parse
 from admin import *
 from start_handler import *
+from friendship_streaks import show_streaks_menu, show_friend_selection
+from leaderboard import show_leaderboard, leaderboard_command
+from streak_actions import *
 
 # Logging setup
 logging.basicConfig(
@@ -38,7 +41,7 @@ CREATING_TEST = 2
 TAKING_TEST = 3
 
 # Load translations
-from translations import TRANSLATIONS
+from translations import TRANSLATIONS, get_friendship_level_message
 
 question0_img=os.environ.get("question0","")
 question1_img=os.environ.get("question1","")
@@ -800,6 +803,22 @@ async def calculate_test_score(update: Update, context: ContextTypes.DEFAULT_TYP
         }
         supabase.table('test_results').upsert(result_data).execute()
         
+        # NEW: Create or update streak between test taker and test owner
+        from friendship_streaks import get_or_create_streak, update_streak
+        from streak_actions import log_interaction
+        
+        try:
+            streak = get_or_create_streak(user_id, int(test_owner_id))
+            if streak:
+                streak_days = update_streak(streak['id'], user_id, int(test_owner_id))
+                log_interaction(streak['id'], user_id, int(test_owner_id), 'test_completed', {
+                    'test_id': test_id,
+                    'score': percentage
+                })
+                logger.info(f"STREAK_UPDATED_ON_TEST: User {user_id} with owner {test_owner_id} | Streak: {streak_days} days")
+        except Exception as e:
+            logger.error(f"Error updating streak after test: {e}")
+        
         # Notify test owner about the result
         try:
             owner_lang = get_user_language(int(test_owner_id))
@@ -815,24 +834,22 @@ async def calculate_test_score(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception as e:
             logger.error(f"Error notifying test owner: {e}")
         
-        # Show result with action buttons
-        if percentage >= 80:
-            level = get_text(lang, 'level_best_friend')
-            emoji = "🌟"
-        elif percentage >= 60:
-            level = get_text(lang, 'level_close_friend')
-            emoji = "💫"
-        elif percentage >= 40:
-            level = get_text(lang, 'level_friend')
-            emoji = "✨"
-        else:
-            level = get_text(lang, 'level_acquaintance')
-            emoji = "⭐"
+        # Get friendship level and message
+        level_title, level_message = get_friendship_level_message(percentage, lang)
         
-        result_text = f"{emoji} <b>{get_text(lang, 'test_result_title')}</b>\n\n"
-        result_text += get_text(lang, 'test_result').format(
-            score=percentage,
-            level=level
+        # Build result text with proper formatting
+        result_labels = {
+            'uz': {'score': 'Sizning natijangiz', 'level': 'Do\'stlik darajasi'},
+            'ru': {'score': 'Ваш результат', 'level': 'Уровень дружбы'},
+            'en': {'score': 'Your result', 'level': 'Friendship level'}
+        }
+        labels = result_labels.get(lang, result_labels['en'])
+        
+        result_text = (
+            f"🎯 <b>{get_text(lang, 'test_result_title')}</b>\n\n"
+            f"📊 <b>{labels['score']}:</b> {percentage}%\n"
+            f"👤 <b>{labels['level']}:</b> {level_title}\n\n"
+            f"💭 <i>{level_message}</i>"
         )
         
         # Add action buttons
@@ -1185,6 +1202,38 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("my_test", my_test_command))
     application.add_handler(CommandHandler("premium", premium_command))
+   # Commands
+    application.add_handler(CommandHandler("streaks", lambda u, c: show_streaks_menu(u, c)))
+    application.add_handler(CommandHandler("leaderboard", leaderboard_command))
+
+
+    # Daily question conversation
+    daily_q_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(handle_daily_question_answer_prompt, pattern='^daily_q_answer_')],
+        states={
+            ANSWERING_DAILY_Q: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_daily_question_answer_text)]
+        },
+        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('start', start)],
+        allow_reentry=True,
+        per_message=False
+    )
+    application.add_handler(daily_q_conv)
+    
+    # Remember friend conversation
+    remember_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(handle_remember_friend_start, pattern='^streak_friend_remember_')],
+        states={
+            REMEMBERING_FRIEND: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_remember_friend_answer)]
+        },
+        fallbacks=[CommandHandler('cancel', cancel), CommandHandler('start', start)],
+        allow_reentry=True,
+        per_message=False
+    )
+    application.add_handler(remember_conv)
+
+    # Conversation handlers
+    application.add_handler(daily_q_conv)
+    application.add_handler(remember_conv)
 
 
     # Birthday conversation handler
@@ -1227,6 +1276,29 @@ def main():
     application.add_handler(CallbackQueryHandler(share_main, pattern='^share_bot$'))
     application.add_handler(CallbackQueryHandler(subscribe_callback, pattern='^subscribe_'))
     application.add_handler(CallbackQueryHandler(recreate_test, pattern='^recreate_test$'))
+    # Streaks menu and actions
+    application.add_handler(CallbackQueryHandler(show_streaks_menu, pattern='^streaks_menu$'))
+    application.add_handler(CallbackQueryHandler(show_leaderboard, pattern='^streak_leaderboard$'))
+    
+    # Friend selection for different actions
+    application.add_handler(CallbackQueryHandler(handle_ping_friend, pattern='^streak_ping$'))
+    application.add_handler(CallbackQueryHandler(lambda u, c: show_friend_selection(u, c, 'daily_q'), pattern='^streak_daily_q$'))
+    application.add_handler(CallbackQueryHandler(lambda u, c: show_friend_selection(u, c, 'remember'), pattern='^streak_remember$'))
+    application.add_handler(CallbackQueryHandler(lambda u, c: show_friend_selection(u, c, 'guess'), pattern='^streak_guess$'))
+    application.add_handler(CallbackQueryHandler(lambda u, c: show_friend_selection(u, c, 'quiz'), pattern='^streak_quiz$'))
+    application.add_handler(CallbackQueryHandler(lambda u, c: show_friend_selection(u, c, 'weekly'), pattern='^streak_weekly$'))
+    
+    # Specific streak actions
+
+    application.add_handler(CallbackQueryHandler(handle_ping_friend, pattern='^streak_friend_ping_'))
+    application.add_handler(CallbackQueryHandler(handle_daily_question_start, pattern='^streak_friend_daily_q_'))
+    application.add_handler(CallbackQueryHandler(handle_daily_question_send, pattern='^daily_q_send_'))
+    application.add_handler(CallbackQueryHandler(handle_guess_game, pattern='^streak_friend_guess_'))
+    application.add_handler(CallbackQueryHandler(handle_guess_answer, pattern='^guess_answer_'))
+    application.add_handler(CallbackQueryHandler(handle_weekly_checkin, pattern='^streak_friend_weekly_'))
+    application.add_handler(CallbackQueryHandler(handle_weekly_yes, pattern='^weekly_yes_'))
+    application.add_handler(CallbackQueryHandler(handle_weekly_no, pattern='^weekly_no_'))
+    application.add_handler(CallbackQueryHandler(handle_quiz_retake, pattern='^streak_friend_quiz_'))
 
     # Set up daily birthday check (runs at 9 AM UTC)
     job_queue = application.job_queue
