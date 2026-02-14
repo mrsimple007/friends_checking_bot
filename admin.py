@@ -59,3 +59,46 @@ async def get_premium_users() -> int:
     except Exception as e:
         logger.error(f"Error getting premium users: {e}")
         return 0
+    
+
+async def get_total_streaks():
+    """Get total number of active streaks"""
+    try:
+        result = supabase.table('friendship_streaks')\
+            .select('id', count='exact')\
+            .gt('current_streak', 0)\
+            .execute()
+        return result.count if result.count else 0
+    except Exception as e:
+        logger.error(f"Error getting total streaks: {e}")
+        return 0
+
+async def get_longest_streak():
+    """Get the longest current streak"""
+    try:
+        result = supabase.table('friendship_streaks')\
+            .select('current_streak')\
+            .order('current_streak', desc=True)\
+            .limit(1)\
+            .execute()
+        if result.data:
+            return result.data[0]['current_streak']
+        return 0
+    except Exception as e:
+        logger.error(f"Error getting longest streak: {e}")
+        return 0
+
+async def get_average_streak():
+    """Get average streak length among active streaks"""
+    try:
+        result = supabase.table('friendship_streaks')\
+            .select('current_streak')\
+            .gt('current_streak', 0)\
+            .execute()
+        if result.data:
+            streaks = [s['current_streak'] for s in result.data]
+            return sum(streaks) / len(streaks) if streaks else 0
+        return 0
+    except Exception as e:
+        logger.error(f"Error getting average streak: {e}")
+        return 0

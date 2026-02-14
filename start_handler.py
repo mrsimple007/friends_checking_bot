@@ -20,13 +20,14 @@ from balance import premium_info_handler, subscribe_callback, approve_premium_pa
 import urllib.parse
 from admin import *
 
-# Add this function after your existing helper functions
 async def notify_admin_new_user(context: ContextTypes.DEFAULT_TYPE, user_id: int, username: str, first_name: str, last_name: str):
     """Notify admin about new user registration"""
     try:
-        # Get total user count
-        total_users_result = supabase.table('friends_users').select('id', count='exact').execute()
-        total_users = total_users_result.count if total_users_result.count else 0
+        # Get total counts
+        total_users, total_streaks = await asyncio.gather(
+            get_total_users(),
+            get_total_streaks()
+        )
         
         # Format user info
         full_name = f"{first_name or ''} {last_name or ''}".strip()
@@ -37,7 +38,8 @@ async def notify_admin_new_user(context: ContextTypes.DEFAULT_TYPE, user_id: int
             f"👤 <b>Name:</b> {full_name or 'No name'}\n"
             f"🔤 <b>Username:</b> {username_str}\n"
             f"🆔 <b>User ID:</b> <code>{user_id}</code>\n\n"
-            f"📊 <b>Total Users:</b> {total_users}"
+            f"📊 <b>Total Users:</b> {total_users}\n"
+            f"🔥 <b>Active Streaks:</b> {total_streaks}"
         )
         
         # Send to all notification admins
@@ -306,13 +308,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Show admin dashboard if admin
             if user.id in NOTIFICATION_ADMIN_IDS:
-                total_users, total_birthdays, total_tests, total_results, todays_active, premium_count = await asyncio.gather(
+                total_users, total_birthdays, total_tests, total_results, todays_active, premium_count, total_streaks, longest_streak, avg_streak = await asyncio.gather(
                     get_total_users(),
                     get_total_birthdays(),
                     get_total_tests(),
                     get_total_test_results(),
                     get_todays_active_users(),
-                    get_premium_users()
+                    get_premium_users(),
+                    get_total_streaks(),
+                    get_longest_streak(),
+                    get_average_streak()
                 )
 
                 admin_message = (
@@ -323,10 +328,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"📈 <b>Content:</b>\n"
                     f"  🎂 Birthdays saved: {total_birthdays}\n"
                     f"  📝 Tests created: {total_tests}\n"
-                    f"  ✅ Tests taken: {total_results}\n\n"
+                    f"  ✅ Tests taken: {total_results}\n"
+                    f"  🔥 Active streaks: {total_streaks}\n\n"
                     f"📊 <b>Averages:</b>\n"
                     f"  • Birthdays / user: {total_birthdays / total_users if total_users else 0:.1f}\n"
-                    f"  • Tests taken / test: {total_results / total_tests if total_tests else 0:.1f}"
+                    f"  • Tests taken / test: {total_results / total_tests if total_tests else 0:.1f}\n\n"
+                    f"🏆 <b>Streak Stats:</b>\n"
+                    f"  • Longest streak: {longest_streak} days\n"
+                    f"  • Average streak: {avg_streak:.1f} days"
                 )
 
                 await update.message.reply_text(
