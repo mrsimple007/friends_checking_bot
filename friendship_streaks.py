@@ -141,7 +141,15 @@ STREAK_TRANSLATIONS = {
         'create_test': '📝 Test yaratish',
         'ping_sent': '✅ <b>Salom yuborildi!</b>\n\n👋 {friend_name}ga salom yubordingiz!\n\n🔥 Streak: {days} kun\n\n💡 <i>Har kunlik muloqot streakni davom ettiradi!</i>',
         'ping_received': '👋 <b>Salom!</b>\n\n{sender_name} sizga salom yubordi!\n\n🔥 Streak: {days} kun',
-
+        'streak_title': '🔥 <b>Har kunlik muloqot</b>',
+        'your_streaks': '📊 <b>Sizning eng uzoq do\'stlik muloqotlaringiz</b>\n\nDo\'stlaringiz bilan ketma-ket kunlik muloqot:',
+        'no_streaks': '😔 <b>Hali har kunlik muloqot yo\'q</b>\n\nDo\'stlaringiz bilan har kuni gaplashing va muloqot rekordini yarating!',
+        'streak_with': '🔥 <b>{name}</b> bilan: {days} kun ketma-ket',
+        'ping_friend': '👋 Salom yo\'llang',
+        'leaderboard': '🏆 Liderlar jadvali',
+        'back': '◀️ Orqaga',
+        'streak_link_created': '✅ <b>Havola tayyor!</b>\n\n💡 <i>Havolani do\'stlaringizga ulashing. Ular uni bosganida har kunlik muloqot avtomatik boshlanadi!</i>\n\n🔗 <b>Havola:</b>\n<code>{link}</code>',
+        'share_test': '📤 Ulashish',
 
 
 
@@ -202,7 +210,15 @@ STREAK_TRANSLATIONS = {
         'ping_sent': '✅ <b>Привет отправлен!</b>\n\n👋 Вы поздоровались с {friend_name}!\n\n🔥 Полоса: {days} дней\n\n💡 <i>Ежедневное общение поддерживает полосу!</i>',
         'ping_received': '👋 <b>Привет!</b>\n\n{sender_name} поздоровался с вами!\n\n🔥 Полоса: {days} дней',
 
-
+        'streak_title': '🔥 <b>Ежедневное общение</b>',
+        'your_streaks': '📊 <b>Ваши самые длинные общения с друзьями</b>\n\nПоследовательные дни общения с друзьями:',
+        'no_streaks': '😔 <b>Пока нет ежедневного общения</b>\n\nОбщайтесь с друзьями каждый день и создайте рекорд общения!',
+        'streak_with': '🔥 <b>{name}</b>: {days} дней подряд',
+        'ping_friend': '👋 Отправить привет',
+        'leaderboard': '🏆 Таблица лидеров',
+        'back': '◀️ Назад',
+        'streak_link_created': '✅ <b>Ссылка готова!</b>\n\n💡 <i>Поделитесь ссылкой с друзьями. Когда они нажмут её, ежедневное общение автоматически начнётся!</i>\n\n🔗 <b>Ссылка:</b>\n<code>{link}</code>',
+        'share_test': '📤 Поделиться',
 
 
 
@@ -266,7 +282,15 @@ STREAK_TRANSLATIONS = {
         'ping_sent': '✅ <b>Ping sent!</b>\n\n👋 You pinged {friend_name}!\n\n🔥 Streak: {days} days\n\n💡 <i>Daily interaction keeps the streak alive!</i>',
         'ping_received': '👋 <b>Ping!</b>\n\n{sender_name} says hi!\n\n🔥 Streak: {days} days',
     
-
+        'streak_title': '🔥 <b>Daily Communication</b>',
+        'your_streaks': '📊 <b>Your Longest Friend Communications</b>\n\nConsecutive days of communication with friends:',
+        'no_streaks': '😔 <b>No daily communication yet</b>\n\nChat with your friends every day and create a communication record!',
+        'streak_with': '🔥 <b>{name}</b>: {days} days in a row',
+        'ping_friend': '👋 Send Hello',
+        'leaderboard': '🏆 Leaderboard',
+        'back': '◀️ Back',
+        'streak_link_created': '✅ <b>Link ready!</b>\n\n💡 <i>Share the link with your friends. When they click it, daily communication will automatically start!</i>\n\n🔗 <b>Link:</b>\n<code>{link}</code>',
+        'share_test': '📤 Share',
 
 
 
@@ -417,14 +441,14 @@ async def get_user_friends(user_id: int) -> List[Dict]:
 
 
 async def show_streaks_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show main streaks menu"""
+    """Show simplified streaks menu with only 2 buttons"""
     query = update.callback_query
     if query:
         await query.answer()
     
     user_id = update.effective_user.id
     
-    # FIX: Get language from database, not from context
+    # Get language from database
     try:
         result = supabase.table('friends_users').select('language').eq('telegram_id', str(user_id)).execute()
         if result.data:
@@ -434,7 +458,6 @@ async def show_streaks_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         lang = 'en'
     
-    # Store in context for other handlers
     context.user_data['language'] = lang
     
     # Get user's streaks
@@ -450,7 +473,7 @@ async def show_streaks_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if streaks.data:
             text += get_streak_text(lang, 'your_streaks') + '\n\n'
             
-            for streak in streaks.data:
+            for streak in streaks.data[:5]:  # Show top 5
                 friend_id = streak['friend_id'] if str(streak['user_id']) == str(user_id) else streak['user_id']
                 
                 # Get friend name
@@ -470,41 +493,18 @@ async def show_streaks_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             text += get_streak_text(lang, 'no_streaks')
         
+        # Simplified keyboard with only 2 buttons
         keyboard = [
-            [
-                InlineKeyboardButton(
-                    get_streak_text(lang, 'ping_friend'),
-                    callback_data='streak_ping'
-                ),
-                InlineKeyboardButton(
-                    get_streak_text(lang, 'daily_question'),
-                    callback_data='streak_daily_q'
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    get_streak_text(lang, 'remember_friend'),
-                    callback_data='streak_remember'
-                ),
-                InlineKeyboardButton(
-                    get_streak_text(lang, 'guess_game'),
-                    callback_data='streak_guess'
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    get_streak_text(lang, 'quiz_retake'),
-                    callback_data='streak_quiz'
-                ),
-                InlineKeyboardButton(
-                    get_streak_text(lang, 'weekly_checkin'),
-                    callback_data='streak_weekly'
-                )
-            ],
             [
                 InlineKeyboardButton(
                     get_streak_text(lang, 'leaderboard'),
                     callback_data='streak_leaderboard'
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    get_streak_text(lang, 'ping_friend'),
+                    callback_data='streak_ping'
                 )
             ],
             [

@@ -19,6 +19,116 @@ logger = logging.getLogger(__name__)
 ANSWERING_DAILY_Q = 100
 REMEMBERING_FRIEND = 101
 
+
+STREAK_QUOTES = {
+    'uz': [
+        "Do'stlik - bu har kuni yangilanishi kerak bo'lgan gul.",
+        "Yaqin do'st - bu ikkinchi o'zing.",
+        "Do'stlikni saqlash - bu baxt kaliti.",
+        "Har kunlik muloqot do'stlikni mustahkamlaydi.",
+        "Haqiqiy do'stlik vaqt sinovi bilan tekshiriladi.",
+        "Do'st ko'nglida - ko'ngilning ko'zgusi.",
+        "Yaxshi do'st - eng qimmatli xazina.",
+        "Do'stlik - bu hayotning eng go'zal in'omi.",
+        "Sodiq do'st - oltin topilmasi.",
+        "Do'stlar bilan vaqt - eng yaxshi vaqt!",
+    ],
+    'ru': [
+        "Дружба - это цветок, который нужно поливать каждый день.",
+        "Близкий друг - это второе я.",
+        "Сохранение дружбы - ключ к счастью.",
+        "Ежедневное общение укрепляет дружбу.",
+        "Настоящая дружба проверяется временем.",
+        "Друг в сердце - зеркало души.",
+        "Хороший друг - самое ценное сокровище.",
+        "Дружба - самый прекрасный дар жизни.",
+        "Верный друг - золотая находка.",
+        "Время с друзьями - лучшее время!",
+    ],
+    'en': [
+        "Friendship is a flower that needs watering every day.",
+        "A close friend is your second self.",
+        "Maintaining friendship is the key to happiness.",
+        "Daily communication strengthens friendship.",
+        "True friendship is tested by time.",
+        "A friend in your heart is a mirror of your soul.",
+        "A good friend is the most valuable treasure.",
+        "Friendship is life's most beautiful gift.",
+        "A loyal friend is a golden find.",
+        "Time with friends is the best time!",
+    ]
+}
+
+
+
+def get_streak_message(streak_days: int, lang: str, include_cta: bool = True) -> str:
+    """Get appropriate message based on streak days with call-to-action"""
+    quotes = STREAK_QUOTES.get(lang, STREAK_QUOTES['en'])
+    quote = random.choice(quotes)
+    
+    # Call-to-action messages
+    cta_messages = {
+        'uz': "\n\n🏆 /leaderboard orqali eng yaxshi do'stliklarni ko'ring!\n💪 Raqobatlashing va TOP-20 ga kirish uchun do'stingiz bilan har kuni muloqot qiling!",
+        'ru': "\n\n🏆 Смотрите лучшие дружбы через /leaderboard!\n💪 Соревнуйтесь и общайтесь каждый день, чтобы попасть в ТОП-20!",
+        'en': "\n\n🏆 Check the best friendships via /leaderboard!\n💪 Compete and communicate daily to reach TOP-20!"
+    }
+    
+    messages = {
+        'uz': {
+            1: f"✅ <b>Muloqot boshlandi!</b>\n\n🔥 1-kun\n\n💭 <i>{quote}</i>",
+            2: f"🎉 <b>Muloqot davom etmoqda!</b>\n\n🔥 2-kun\n\n💭 <i>{quote}</i>",
+            3: f"🔥 <b>Ajoyib!</b>\n\n🔥 3-kun\n\n💭 <i>{quote}</i>",
+            7: f"⭐ <b>Bir hafta!</b>\n\n🔥 7-kun ketma-ket\n\n💭 <i>{quote}</i>\n\n🎯 <i>Siz allaqachon ko'pchilikdan oldinda!</i>",
+            14: f"🌟 <b>Ikki hafta!</b>\n\n🔥 14-kun ketma-ket\n\n💭 <i>{quote}</i>\n\n🎯 <i>Ajoyib natija! Davom eting!</i>",
+            30: f"🏆 <b>Bir oy!</b>\n\n🔥 30-kun ketma-ket\n\n💭 <i>{quote}</i>\n\n🎯 <i>Siz TOP-20 ga yaqinsiz!</i>",
+            50: f"💎 <b>50 kun!</b>\n\n🔥 Afsona darajasida!\n\n💭 <i>{quote}</i>\n\n🎯 <i>Liderlar jadvalida o'rningizni tekshiring!</i>",
+            100: f"👑 <b>100 kun!</b>\n\n🔥 Siz haqiqiy chempionsiz!\n\n💭 <i>{quote}</i>\n\n🎯 <i>Bu muloqot tarixga kirdi!</i>",
+        },
+        'ru': {
+            1: f"✅ <b>Общение началось!</b>\n\n🔥 День 1\n\n💭 <i>{quote}</i>",
+            2: f"🎉 <b>Общение продолжается!</b>\n\n🔥 День 2\n\n💭 <i>{quote}</i>",
+            3: f"🔥 <b>Отлично!</b>\n\n🔥 День 3\n\n💭 <i>{quote}</i>",
+            7: f"⭐ <b>Неделя!</b>\n\n🔥 7 дней подряд\n\n💭 <i>{quote}</i>\n\n🎯 <i>Вы уже впереди многих!</i>",
+            14: f"🌟 <b>Две недели!</b>\n\n🔥 14 дней подряд\n\n💭 <i>{quote}</i>\n\n🎯 <i>Отличный результат! Продолжайте!</i>",
+            30: f"🏆 <b>Месяц!</b>\n\n🔥 30 дней подряд\n\n💭 <i>{quote}</i>\n\n🎯 <i>Вы близки к ТОП-20!</i>",
+            50: f"💎 <b>50 дней!</b>\n\n🔥 Легендарный уровень!\n\n💭 <i>{quote}</i>\n\n🎯 <i>Проверьте свою позицию в таблице лидеров!</i>",
+            100: f"👑 <b>100 дней!</b>\n\n🔥 Вы настоящие чемпионы!\n\n💭 <i>{quote}</i>\n\n🎯 <i>Это общение вошло в историю!</i>",
+        },
+        'en': {
+            1: f"✅ <b>Communication started!</b>\n\n🔥 Day 1\n\n💭 <i>{quote}</i>",
+            2: f"🎉 <b>Communication continues!</b>\n\n🔥 Day 2\n\n💭 <i>{quote}</i>",
+            3: f"🔥 <b>Awesome!</b>\n\n🔥 Day 3\n\n💭 <i>{quote}</i>",
+            7: f"⭐ <b>One week!</b>\n\n🔥 7 days in a row\n\n💭 <i>{quote}</i>\n\n🎯 <i>You're already ahead of many!</i>",
+            14: f"🌟 <b>Two weeks!</b>\n\n🔥 14 days in a row\n\n💭 <i>{quote}</i>\n\n🎯 <i>Great result! Keep going!</i>",
+            30: f"🏆 <b>One month!</b>\n\n🔥 30 days in a row\n\n💭 <i>{quote}</i>\n\n🎯 <i>You're close to TOP-20!</i>",
+            50: f"💎 <b>50 days!</b>\n\n🔥 Legendary level!\n\n💭 <i>{quote}</i>\n\n🎯 <i>Check your position on the leaderboard!</i>",
+            100: f"👑 <b>100 days!</b>\n\n🔥 You're true champions!\n\n💭 <i>{quote}</i>\n\n🎯 <i>This communication has made history!</i>",
+        }
+    }
+    
+    lang_messages = messages.get(lang, messages['en'])
+    
+    # Get milestone message or default
+    if streak_days in lang_messages:
+        message = lang_messages[streak_days]
+    elif streak_days < 7:
+        message = lang_messages.get(3, "").replace("3", str(streak_days))
+    else:
+        # For days > 3 but not milestone, use generic format
+        if lang == 'uz':
+            message = f"🔥 <b>{streak_days}-kun ketma-ket!</b>\n\n💭 <i>{quote}</i>"
+        elif lang == 'ru':
+            message = f"🔥 <b>День {streak_days} подряд!</b>\n\n💭 <i>{quote}</i>"
+        else:
+            message = f"🔥 <b>Day {streak_days} in a row!</b>\n\n💭 <i>{quote}</i>"
+    
+    # Add CTA for first 3 days and milestones
+    if include_cta and (streak_days <= 3 or streak_days in [7, 14, 30, 50, 100]):
+        message += cta_messages.get(lang, cta_messages['en'])
+    
+    return message
+
+
 def log_interaction(streak_id: int, user_id: int, friend_id: int, interaction_type: str, data: dict = None):
     """Log streak interaction to database"""
     try:
@@ -38,7 +148,7 @@ def log_interaction(streak_id: int, user_id: int, friend_id: int, interaction_ty
 
 
 async def handle_ping_friend(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle ping friend action - create shareable streak link without friend selection"""
+    """Handle ping friend action - create shareable streak link"""
     query = update.callback_query
     await query.answer()
     
@@ -59,7 +169,7 @@ async def handle_ping_friend(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     
     try:
-        # Create generic streak link (without specific friend_id)
+        # Create generic streak link
         bot_username = context.bot.username
         streak_link = f"https://t.me/{bot_username}?start=streak_{user_id}"
         
@@ -68,25 +178,19 @@ async def handle_ping_friend(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         # Create share messages
         share_messages = {
-            'uz': f"👋 Salom! {sender_name} siz bilan do'stlik streakini boshlashni xohlaydi!\n\n🔥 Streak boshlash uchun quyidagi havolani bosing:\n{streak_link}",
-            'ru': f"👋 Привет! {sender_name} хочет начать полосу дружбы с вами!\n\n🔥 Нажмите ссылку, чтобы начать полосу:\n{streak_link}",
-            'en': f"👋 Hey! {sender_name} wants to start a friendship streak with you!\n\n🔥 Click the link to start the streak:\n{streak_link}"
+            'uz': f"👋 Salom! {sender_name} siz bilan har kunlik muloqotni boshlashni xohlaydi!\n\n🔥 Boshlash uchun havolani bosing:\n{streak_link}",
+            'ru': f"👋 Привет! {sender_name} хочет начать ежедневное общение с вами!\n\n🔥 Нажмите ссылку, чтобы начать:\n{streak_link}",
+            'en': f"👋 Hey! {sender_name} wants to start daily communication with you!\n\n🔥 Click the link to start:\n{streak_link}"
         }
         
         share_text_encoded = urllib.parse.quote(share_messages.get(lang, share_messages['en']))
         
-        # Show confirmation with share button
-        confirmation_messages = {
-            'uz': f"✅ <b>Streak havolasi tayyor!</b>\n\n💡 <i>Havolani do'stlaringizga ulashing. Ular uni bosganida streak avtomatik boshlanadi!</i>\n\n🔗 <b>Havola:</b>\n<code>{streak_link}</code>",
-            'ru': f"✅ <b>Ссылка на полосу готова!</b>\n\n💡 <i>Поделитесь ссылкой с друзьями. Когда они нажмут её, полоса автоматически начнётся!</i>\n\n🔗 <b>Ссылка:</b>\n<code>{streak_link}</code>",
-            'en': f"✅ <b>Streak link ready!</b>\n\n💡 <i>Share the link with your friends. When they click it, the streak will automatically start!</i>\n\n🔗 <b>Link:</b>\n<code>{streak_link}</code>"
-        }
-        
-        text = confirmation_messages.get(lang, confirmation_messages['en'])
+        # Show confirmation
+        text = get_streak_text(lang, 'streak_link_created').format(link=streak_link)
         
         keyboard = [
             [InlineKeyboardButton(
-                get_streak_text(lang, 'share_test'),  # Reuse "Share" translation
+                get_streak_text(lang, 'share_test'),
                 url=f"https://t.me/share/url?url={streak_link}&text={share_text_encoded}"
             )],
             [InlineKeyboardButton(
@@ -97,11 +201,12 @@ async def handle_ping_friend(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode=ParseMode.HTML)
         
-        logger.info(f"STREAK_LINK_CREATED: User {user_id} created general streak link")
+        logger.info(f"STREAK_LINK_CREATED: User {user_id} created streak link")
         
     except Exception as e:
         logger.error(f"Error creating streak link: {e}")
         await query.edit_message_text("❌ Error creating streak link")
+
 
 async def handle_daily_question_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start daily question flow"""

@@ -5,14 +5,16 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
 from config import supabase
+import urllib.parse
+import asyncio
 
 logger = logging.getLogger(__name__)
 
 LEADERBOARD_TRANSLATIONS = {
     'uz': {
         'title': '🏆 <b>Liderlar jadvali</b>',
-        'weekly_scores': '📊 <b>Haftalik eng yaxshi natijalar</b>',
-        'longest_streaks': '🔥 <b>Eng uzun streaklar</b>',
+        'weekly_scores': '📊 <b>Haftalik eng yaxshi test natijalari</b>',
+        'longest_streaks': '🔥 <b>Eng uzun har kunlik muloqotlar</b>',
         'your_rank': '📍 <b>Sizning o\'rningiz:</b>',
         'no_data': '😔 Ma\'lumotlar yo\'q',
         'back': '◀️ Orqaga',
@@ -22,8 +24,8 @@ LEADERBOARD_TRANSLATIONS = {
     },
     'ru': {
         'title': '🏆 <b>Таблица лидеров</b>',
-        'weekly_scores': '📊 <b>Лучшие результаты недели</b>',
-        'longest_streaks': '🔥 <b>Самые длинные полосы</b>',
+        'weekly_scores': '📊 <b>Лучшие результаты тестов недели</b>',
+        'longest_streaks': '🔥 <b>Самые длинные ежедневные общения</b>',
         'your_rank': '📍 <b>Ваше место:</b>',
         'no_data': '😔 Нет данных',
         'back': '◀️ Назад',
@@ -33,8 +35,8 @@ LEADERBOARD_TRANSLATIONS = {
     },
     'en': {
         'title': '🏆 <b>Leaderboard</b>',
-        'weekly_scores': '📊 <b>Top Weekly Scores</b>',
-        'longest_streaks': '🔥 <b>Longest Streaks</b>',
+        'weekly_scores': '📊 <b>Top Weekly Test Scores</b>',
+        'longest_streaks': '🔥 <b>Longest Daily Communications</b>',
         'your_rank': '📍 <b>Your Rank:</b>',
         'no_data': '😔 No data available',
         'back': '◀️ Back',
@@ -50,21 +52,24 @@ def get_leaderboard_text(lang: str, key: str) -> str:
 
 
 def get_weekly_top_scores() -> List[Dict]:
-    """Get top test scores from this week"""
+    """Get top 10 test scores from this week (OPTIMIZED)"""
     try:
         # Calculate start of week (Monday)
         now = datetime.now(timezone.utc)
         start_of_week = now - timedelta(days=now.weekday())
         start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
         
-        # Get test results from this week
+        # Get test results from this week - LIMIT to 100 for speed
         results = supabase.table('test_results')\
             .select('user_id, score, created_at')\
             .gte('created_at', start_of_week.isoformat())\
             .order('score', desc=True)\
             .order('created_at', desc=False)\
-            .limit(50)\
+            .limit(100)\
             .execute()
+        
+        if not results.data:
+            return []
         
         # Group by user and get their best score
         user_scores = {}
@@ -75,29 +80,39 @@ def get_weekly_top_scores() -> List[Dict]:
             if user_id not in user_scores or score > user_scores[user_id]:
                 user_scores[user_id] = score
         
-        # Get user info and format leaderboard
+        # Sort and take top 10
+        top_users = sorted(user_scores.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        # Batch fetch user info for all top users
+        user_ids = [str(user_id) for user_id, _ in top_users]
+        
+        user_info_result = supabase.table('friends_users')\
+            .select('telegram_id, first_name, last_name, username')\
+            .in_('telegram_id', user_ids)\
+            .execute()
+        
+        # Create a map of user_id to user info
+        user_info_map = {}
+        if user_info_result.data:
+            for user in user_info_result.data:
+                user_info_map[user['telegram_id']] = user
+        
+        # Build leaderboard
         leaderboard = []
-        for user_id, score in sorted(user_scores.items(), key=lambda x: x[1], reverse=True)[:10]:
-            try:
-                user_info = supabase.table('friends_users')\
-                    .select('first_name, last_name, username')\
-                    .eq('telegram_id', user_id)\
-                    .execute()
-                
-                if user_info.data:
-                    user = user_info.data[0]
-                    name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
-                    if not name:
-                        name = user.get('username', 'User')
-                    
-                    leaderboard.append({
-                        'user_id': user_id,
-                        'name': name,
-                        'score': score
-                    })
-            except Exception as e:
-                logger.error(f"Error getting user info for leaderboard: {e}")
-                continue
+        for user_id, score in top_users:
+            user = user_info_map.get(str(user_id))
+            if user:
+                name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+                if not name:
+                    name = user.get('username', 'User')
+            else:
+                name = 'User'
+            
+            leaderboard.append({
+                'user_id': user_id,
+                'name': name,
+                'score': score
+            })
         
         logger.info(f"LEADERBOARD_WEEKLY: Generated with {len(leaderboard)} entries")
         return leaderboard
@@ -106,74 +121,80 @@ def get_weekly_top_scores() -> List[Dict]:
         logger.error(f"Error getting weekly top scores: {e}")
         return []
 
-
 def get_longest_streaks() -> List[Dict]:
-    """Get top 10 longest current streaks"""
+    """Get top 10 longest current streaks (OPTIMIZED)"""
     try:
+        # Get top 30 streaks (faster than 40)
         streaks = supabase.table('friendship_streaks')\
             .select('user_id, friend_id, current_streak')\
+            .gt('current_streak', 0)\
             .order('current_streak', desc=True)\
-            .limit(20)\
+            .limit(30)\
             .execute()
+        
+        if not streaks.data:
+            return []
         
         leaderboard = []
         seen_pairs = set()
+        
+        # Collect all user IDs to batch fetch
+        all_user_ids = set()
+        valid_streaks = []
         
         for streak in streaks.data:
             user_id = int(streak['user_id'])
             friend_id = int(streak['friend_id'])
             current_streak = streak['current_streak']
             
-            # Skip if no streak
             if current_streak == 0:
                 continue
             
-            # Create a sorted tuple to avoid duplicates
             pair = tuple(sorted([user_id, friend_id]))
-            
             if pair in seen_pairs:
                 continue
             
             seen_pairs.add(pair)
+            valid_streaks.append((user_id, friend_id, current_streak))
+            all_user_ids.add(str(user_id))
+            all_user_ids.add(str(friend_id))
             
-            try:
-                # Get both users' info
-                user1_info = supabase.table('friends_users')\
-                    .select('first_name, last_name, username')\
-                    .eq('telegram_id', str(user_id))\
-                    .execute()
+            if len(valid_streaks) >= 10:
+                break
+        
+        # Batch fetch all user info at once
+        user_info_result = supabase.table('friends_users')\
+            .select('telegram_id, first_name, last_name, username')\
+            .in_('telegram_id', list(all_user_ids))\
+            .execute()
+        
+        # Create user info map
+        user_info_map = {}
+        if user_info_result.data:
+            for user in user_info_result.data:
+                user_info_map[user['telegram_id']] = user
+        
+        # Build leaderboard
+        for user_id, friend_id, current_streak in valid_streaks:
+            user1 = user_info_map.get(str(user_id))
+            user2 = user_info_map.get(str(friend_id))
+            
+            if user1 and user2:
+                name1 = f"{user1.get('first_name', '')} {user1.get('last_name', '')}".strip()
+                if not name1:
+                    name1 = user1.get('username', 'User')
                 
-                user2_info = supabase.table('friends_users')\
-                    .select('first_name, last_name, username')\
-                    .eq('telegram_id', str(friend_id))\
-                    .execute()
+                name2 = f"{user2.get('first_name', '')} {user2.get('last_name', '')}".strip()
+                if not name2:
+                    name2 = user2.get('username', 'User')
                 
-                if user1_info.data and user2_info.data:
-                    user1 = user1_info.data[0]
-                    user2 = user2_info.data[0]
-                    
-                    name1 = f"{user1.get('first_name', '')} {user1.get('last_name', '')}".strip()
-                    if not name1:
-                        name1 = user1.get('username', 'User')
-                    
-                    name2 = f"{user2.get('first_name', '')} {user2.get('last_name', '')}".strip()
-                    if not name2:
-                        name2 = user2.get('username', 'User')
-                    
-                    leaderboard.append({
-                        'user1_id': user_id,
-                        'user2_id': friend_id,
-                        'name1': name1,
-                        'name2': name2,
-                        'streak': current_streak
-                    })
-                    
-                    if len(leaderboard) >= 10:
-                        break
-                        
-            except Exception as e:
-                logger.error(f"Error getting user info for streak leaderboard: {e}")
-                continue
+                leaderboard.append({
+                    'user1_id': user_id,
+                    'user2_id': friend_id,
+                    'name1': name1,
+                    'name2': name2,
+                    'streak': current_streak
+                })
         
         logger.info(f"LEADERBOARD_STREAKS: Generated with {len(leaderboard)} entries")
         return leaderboard
@@ -200,7 +221,7 @@ def get_user_rank_in_streaks(user_id: int, longest_streaks: List[Dict]) -> Tuple
 
 
 async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show leaderboard with weekly scores and longest streaks"""
+    """Show leaderboard with top 10 test scores and top 10 longest streaks"""
     query = update.callback_query
     if query:
         await query.answer()
@@ -208,12 +229,27 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     lang = context.user_data.get('language', 'en')
     
+    # Show typing indicator
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     
     try:
-        # Get leaderboards
-        weekly_scores = get_weekly_top_scores()
-        longest_streaks = get_longest_streaks()
+        # Run both queries in parallel for speed
+        weekly_scores_task = asyncio.create_task(asyncio.to_thread(get_weekly_top_scores))
+        longest_streaks_task = asyncio.create_task(asyncio.to_thread(get_longest_streaks))
+        
+        weekly_scores, longest_streaks = await asyncio.gather(
+            weekly_scores_task,
+            longest_streaks_task,
+            return_exceptions=True
+        )
+        
+        # Handle exceptions
+        if isinstance(weekly_scores, Exception):
+            logger.error(f"Error getting weekly scores: {weekly_scores}")
+            weekly_scores = []
+        if isinstance(longest_streaks, Exception):
+            logger.error(f"Error getting longest streaks: {longest_streaks}")
+            longest_streaks = []
         
         # Build message
         text = get_leaderboard_text(lang, 'title') + '\n\n'
@@ -228,7 +264,7 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Show user's rank if not in top 10
             user_rank, user_score = get_user_rank_in_weekly(user_id, weekly_scores)
-            if user_rank > 10:
+            if user_rank > 10 and user_rank > 0:
                 text += f'\n{get_leaderboard_text(lang, "your_rank")} #{user_rank} ({user_score}%)\n'
         else:
             text += f'<i>{get_leaderboard_text(lang, "no_data")}</i>\n'
@@ -245,15 +281,66 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Show user's best streak if not in top 10
             streak_rank, streak_days = get_user_rank_in_streaks(user_id, longest_streaks)
-            if streak_rank > 10:
+            if streak_rank > 10 and streak_rank > 0:
                 text += f'\n{get_leaderboard_text(lang, "your_rank")} #{streak_rank} ({streak_days} {get_leaderboard_text(lang, "days")})\n'
         else:
             text += f'<i>{get_leaderboard_text(lang, "no_data")}</i>\n'
         
-        keyboard = [[InlineKeyboardButton(
-            get_leaderboard_text(lang, 'back'),
-            callback_data='streaks_menu'
-        )]]
+        # Create share link for streak
+        bot_username = context.bot.username
+        streak_link = f"https://t.me/{bot_username}?start=streak_{user_id}"
+        
+        # Get user name for share message
+        user_info = supabase.table('friends_users')\
+            .select('first_name, last_name')\
+            .eq('telegram_id', str(user_id))\
+            .execute()
+        
+        user_name = 'Friend'
+        if user_info.data:
+            user_name = f"{user_info.data[0].get('first_name', '')} {user_info.data[0].get('last_name', '')}".strip()
+        
+        # Share messages
+        share_messages = {
+            'uz': f"👋 Salom! Men {user_name} siz bilan har kunlik muloqotni boshlashni xohlayman!\n\n🔥 Boshlash uchun havolani bosing:\n{streak_link}",
+            'ru': f"👋 Привет! {user_name} хочет начать ежедневное общение с вами!\n\n🔥 Нажмите ссылку, чтобы начать:\n{streak_link}",
+            'en': f"👋 Hey! {user_name} wants to start daily communication with you!\n\n🔥 Click the link to start:\n{streak_link}"
+        }
+        
+        share_text_encoded = urllib.parse.quote(share_messages.get(lang, share_messages['en']))
+        
+        # Button labels
+        button_labels = {
+            'uz': {
+                'share': '📤 Siz ham do\'stingizga yuboring',
+                'my_test': '📝 Mening testim'
+            },
+            'ru': {
+                'share': '📤 Отправьте своим друзьям',
+                'my_test': '📝 Мой тест'
+            },
+            'en': {
+                'share': '📤 Share with your friends',
+                'my_test': '📝 My test'
+            }
+        }
+        
+        labels = button_labels.get(lang, button_labels['en'])
+        
+        keyboard = [
+            [InlineKeyboardButton(
+                labels['share'],
+                url=f"https://t.me/share/url?url={streak_link}&text={share_text_encoded}"
+            )],
+            [InlineKeyboardButton(
+                labels['my_test'],
+                callback_data='my_tests'
+            )],
+            [InlineKeyboardButton(
+                get_leaderboard_text(lang, 'back'),
+                callback_data='streaks_menu'
+            )]
+        ]
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
