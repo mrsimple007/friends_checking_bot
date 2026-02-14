@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 LEADERBOARD_TRANSLATIONS = {
     'uz': {
         'title': '🏆 <b>Liderlar jadvali</b>',
-        'weekly_scores': '📊 <b>Haftalik eng yaxshi test natijalari</b>',
-        'longest_streaks': '🔥 <b>Eng uzun har kunlik muloqotlar</b>',
+        'weekly_scores': '📊 <b>Haftalik eng yaxshi test natijalari: </b>',
+        'longest_streaks': '🔥 <b>Eng uzun har kunlik muloqotlar: </b>',
         'your_rank': '📍 <b>Sizning o\'rningiz:</b>',
         'no_data': '😔 Ma\'lumotlar yo\'q',
         'back': '◀️ Orqaga',
@@ -24,8 +24,8 @@ LEADERBOARD_TRANSLATIONS = {
     },
     'ru': {
         'title': '🏆 <b>Таблица лидеров</b>',
-        'weekly_scores': '📊 <b>Лучшие результаты тестов недели</b>',
-        'longest_streaks': '🔥 <b>Самые длинные ежедневные общения</b>',
+        'weekly_scores': '📊 <b>Лучшие результаты тестов недели: </b>',
+        'longest_streaks': '🔥 <b>Самые длинные ежедневные общения: </b>',
         'your_rank': '📍 <b>Ваше место:</b>',
         'no_data': '😔 Нет данных',
         'back': '◀️ Назад',
@@ -35,8 +35,8 @@ LEADERBOARD_TRANSLATIONS = {
     },
     'en': {
         'title': '🏆 <b>Leaderboard</b>',
-        'weekly_scores': '📊 <b>Top Weekly Test Scores</b>',
-        'longest_streaks': '🔥 <b>Longest Daily Communications</b>',
+        'weekly_scores': '📊 <b>Top Weekly Test Scores: </b>',
+        'longest_streaks': '🔥 <b>Longest Daily Communications: </b>',
         'your_rank': '📍 <b>Your Rank:</b>',
         'no_data': '😔 No data available',
         'back': '◀️ Back',
@@ -276,7 +276,7 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if longest_streaks:
             for rank, entry in enumerate(longest_streaks[:10], start=1):
-                emoji = '🔥' if rank == 1 else '🌟' if rank == 2 else '✨' if rank == 3 else '  '
+                emoji = '🥇' if rank == 1 else '🥈' if rank == 2 else '🥉' if rank == 3 else '  '
                 text += f'{emoji} {rank}. <b>{entry["name1"]}</b> & <b>{entry["name2"]}</b> — {entry["streak"]} {get_leaderboard_text(lang, "days")}\n'
             
             # Show user's best streak if not in top 10
