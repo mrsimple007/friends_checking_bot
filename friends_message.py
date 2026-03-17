@@ -52,51 +52,49 @@ def generate_message(name, language):
         return (
             f"Hey {escaped_name}\\! 👋\n\n"
             "🔥 *Time to prove your best friendship\\!*\n\n"
-            "💡 *New feature:* Daily Communication Streak\\!\n"
-            "• Start daily communication with your friends\n"
-            "• Compete for the longest streak record\n"
-            "• See who's the most consistent friend\\!\n\n"
-            "🏆 *Current record: 80% on friendship test\\!*\n"
-            "Can you beat it?\n\n"
+            "💡 *New feature:* Weekly Friends Leaderboard\\!\n"
+            "• See who has the most friends on the bot\n"
+            "• Current record: *10 friends*\n"
+            "• Can you beat it\\? Add more friends and climb the leaderboard\\!\n\n"
+            "🏆 *Top players are already competing\\!*\n"
+            "Who will be the most connected friend this week\\?\n\n"
             "⚡️ *Start now:*\n"
             "/start\n\n"
             "📊 Check the leaderboard: /leaderboard\n"
-            "🎯 Prove you're the best friend\\!"
+            "🎯 Prove you're the most connected friend\\!"
         )
 
     elif language == "ru":
         return (
             f"Привет, {escaped_name}\\! 👋\n\n"
-            "🔥 *Время доказать вашу лучшую дружбу\\!*\n\n"
-            "💡 *Новая функция:* Полоса ежедневного общения\\!\n"
-            "• Начните ежедневное общение с друзьями\n"
-            "• Соревнуйтесь за самую длинную полосу\n"
-            "• Узнайте, кто самый последовательный друг\\!\n\n"
-            "🏆 *Текущий рекорд: 80% в тесте на дружбу\\!*\n"
-            "Сможете побить?\n\n"
+            "🔥 *Докажи, что у тебя больше всех друзей\\!*\n\n"
+            "💡 *Новая функция:* Еженедельный рейтинг друзей\\!\n"
+            "• Узнай, у кого больше всего друзей в боте\n"
+            "• Текущий рекорд: *10 друзей*\n"
+            "• Сможешь побить\\? Добавляй друзей и поднимайся в рейтинге\\!\n\n"
+            "🏆 *Лучшие игроки уже соревнуются\\!*\n"
+            "Кто станет самым общительным другом на этой неделе\\?\n\n"
             "⚡️ *Начните сейчас:*\n"
             "/start\n\n"
             "📊 Проверьте таблицу лидеров: /leaderboard\n"
-            "🎯 Докажите, что вы лучший друг\\!"
+            "🎯 Докажите, что вы самый общительный\\!"
         )
 
     elif language == "uz":
         return (
             f"Salom, {escaped_name}\\! 👋\n\n"
-            "🔥 *Ana endim aynan sizning do'stligingiz eng yaxshiligini isbotlash vaqti keldi\\!*\n\n"
-            "💡 *Yangi imkoniyat:* Har kunlik muloqot rekordi\\!\n"
-            "• Do'stlaringiz bilan har kunlik muloqotni boshlang\n"
-            "• Eng uzun muloqot uchun raqobatlashing\n"
-            "• Kim ko'proq bir\\-biriga yaqin ekan, bilib olamiz\\!\n\n"
-            "🏆 *Hozirgi botdagi rekord: 2 kunlik muloqot\\!*\n"
-            "Siz bu rekordni do'stingiz bilan buza olasizmi?\n\n"
+            "🔥 *Eng ko'p do'stga egalingizni isbotlash vaqti keldi\\!*\n\n"
+            "💡 *Yangi imkoniyat:* Haftalik do'stlar reytingi\\!\n"
+            "• Hozirgi rekord: *10 ta do'st*\n"
+            "• Siz bu rekordni sindirolasizmi\\? Testingizni do'stlaringizga yuboring, ularning natijalarini biling va reytinga yuqorilang\\!\n\n"
+            "🏆 *Eng yaxshi o'yinchilar allaqachon raqobatlashmoqda\\!*\n"
+            "Bu hafta kim eng ko'p do'stga ega bo'lar ekan\\?\n\n"
             "⚡️ *Hoziroq boshlang:*\n"
             "/start\n\n"
             "📊 Liderlar jadvalini tekshiring: /leaderboard\n"
-            "🎯 Bizga kim zo'rligini isbotlang\\!"
+            "🎯 Eng ko'p do'stga egalingizni isbotlang\\!"
         )
-    
-    # Default to English if language not recognized
+
     else:
         return generate_message(name, "en")
 
@@ -168,7 +166,7 @@ async def send_to_all_users():
                     successful += 1
                 else:
                     failed += 1
-                    logger.warning(f"Failed to send to {result['chat_id']}: {result.get('error', 'Unknown error')}")
+                    # logger.warning(f"Failed to send to {result['chat_id']}: {result.get('error', 'Unknown error')}")
             
             if i + BATCH_SIZE < len(users):
                 await asyncio.sleep(DELAY)
