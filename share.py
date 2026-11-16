@@ -1,6 +1,6 @@
 """
 Share functionality for Friend Checking Bot with multi-language support
-"""
+""" 
 
 import logging
 import urllib.parse
